@@ -6,12 +6,6 @@ kind: Kustomization
 
 namespace: ips-system
 
-# 通用标签
-labels:
-  - pairs:
-      app: ips
-      managed-by: kustomize
-
 # 通用注解
 commonAnnotations:
   project: "Image Prewarm Service"
