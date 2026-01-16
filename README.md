@@ -11,22 +11,28 @@
 - ✅ 失败节点详情记录
 - ✅ 任务生命周期管理（创建、查询、取消）
 - ✅ 内存存储（MVP）
+- ✅ Docker 容器化支持
+- ✅ Kubernetes 部署配置
+- ✅ 水平自动扩缩容（HPA）
+- ✅ 健康检查和优雅关闭
 
 ## 快速开始
 
-### 前提条件
+### 方式一：本地开发
 
-- Go 1.21+
+#### 前提条件
+
+- Go 1.23+
 - Kubernetes 集群访问权限
 - kubectl 配置（本地测试）或 in-cluster 配置（生产环境）
 
-### 编译
+#### 编译
 
 ```bash
 make build
 ```
 
-### 运行
+#### 运行
 
 ```bash
 # 使用默认配置运行
@@ -39,15 +45,64 @@ make run
 SERVER_PORT=8080 K8S_NAMESPACE=default WORKER_IMAGE=busybox:latest ./bin/apiserver
 ```
 
-### 测试
+#### 测试
 
 ```bash
 # 运行自动化测试脚本
 ./test-api.sh
 
 # 或手动测试
-curl http://localhost:8080/healthz
+curl http://localhost:8080/health
 ```
+
+### 方式二：Docker 部署
+
+#### 使用 Docker
+
+```bash
+# 构建镜像
+make docker-build
+
+# 运行容器
+docker run -d \
+  --name ips-apiserver \
+  -p 8080:8080 \
+  -v ~/.kube/config:/home/ips/.kube/config:ro \
+  -e K8S_NAMESPACE=default \
+  -e WORKER_IMAGE=busybox:latest \
+  ips-apiserver:latest
+```
+
+#### 使用 Docker Compose
+
+```bash
+# 启动服务
+docker-compose up -d
+
+# 查看日志
+docker-compose logs -f
+
+# 停止服务
+docker-compose down
+```
+
+### 方式三：Kubernetes 部署
+
+```bash
+# 快速部署
+make k8s-deploy
+
+# 或手动部署
+kubectl apply -f deploy/
+
+# 查看部署状态
+kubectl get all -n ips-system
+
+# 查看日志
+kubectl logs -l app=ips -n ips-system -f
+```
+
+详细的部署指南请参考 [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md)。
 
 ## API 文档
 
@@ -55,9 +110,9 @@ curl http://localhost:8080/healthz
 
 ```bash
 # 健康检查
-GET /healthz
+GET /health
 
-# 就绪检查
+# 就绪检查 (同 /health)
 GET /readyz
 ```
 
@@ -231,13 +286,30 @@ ips/
 │   ├── repository/         # 存储层
 │   └── k8s/                # K8s 客户端封装
 ├── pkg/
-│   ├── models/             # 数据模型
-│   └── metrics/            # Prometheus 指标
+│   └── models/             # 数据模型
 ├── deploy/                 # K8s 部署配置
-└── client/                 # 客户端 SDK
+│   ├── namespace.yaml      # 命名空间
+│   ├── rbac.yaml           # RBAC 权限
+│   ├── configmap.yaml      # 配置
+│   ├── deployment.yaml     # 部署配置
+│   ├── service.yaml        # 服务
+│   ├── ingress.yaml        # Ingress
+│   ├── hpa.yaml            # 水平自动扩缩容
+│   ├── pdb.yaml            # Pod 中断预算
+│   ├── resource-quota.yaml # 资源配额
+│   ├── kustomization.yaml  # Kustomize 配置
+│   └── DEPLOYMENT.md       # 部署指南
+├── client/                 # 客户端 SDK
+│   └── python/             # Python 客户端
+├── Dockerfile              # Docker 镜像构建
+├── docker-compose.yml      # Docker Compose 配置
+├── Makefile                # 构建和部署命令
+└── README.md               # 项目文档
 ```
 
 ## 开发
+
+### 常用命令
 
 ```bash
 # 格式化代码
@@ -251,7 +323,60 @@ make test
 
 # 清理构建产物
 make clean
+
+# 构建二进制文件
+make build
+
+# 本地运行
+make run
 ```
+
+### Docker 相关
+
+```bash
+# 构建 Docker 镜像
+make docker-build
+
+# 运行 Docker 容器
+make docker-run
+
+# 停止 Docker 容器
+make docker-stop
+
+# 使用 Docker Compose
+make docker-compose-up
+make docker-compose-down
+```
+
+### Kubernetes 相关
+
+```bash
+# 部署到 Kubernetes
+make k8s-deploy
+
+# 查看部署状态
+make k8s-status
+
+# 查看日志
+make k8s-logs
+
+# 删除部署
+make k8s-delete
+
+# 端口转发（本地访问）
+make k8s-port-forward
+```
+
+### 完整命令列表
+
+运行 `make help` 查看所有可用命令。
+
+## 文档
+
+- [API 设计文档](RESTful-API.md)
+- [部署指南](deploy/DEPLOYMENT.md)
+- [开发计划](development-plan.md)
+- [架构设计](plan-arch.md)
 
 ## License
 

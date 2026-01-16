@@ -1,0 +1,15 @@
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ips-apiserver
+  namespace: ips-system
+  labels:
+    app: ips
+    component: apiserver
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: ips
+      component: apiserver

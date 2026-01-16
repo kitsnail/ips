@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ips-config
+  namespace: ips-system
+  labels:
+    app: ips
+    component: apiserver
+data:
+  # 服务端口
+  SERVER_PORT: "8080"
+
+  # K8s 命名空间（IPS 将在此命名空间创建 Job）
+  K8S_NAMESPACE: "default"
+
+  # Worker 镜像（用于创建预热 Job）
+  WORKER_IMAGE: "busybox:latest"
+
+  # 日志级别
+  LOG_LEVEL: "info"

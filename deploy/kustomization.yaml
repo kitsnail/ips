@@ -1,0 +1,51 @@
+# Kustomization 配置
+# 使用 kustomize 管理 Kubernetes 资源
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: ips-system
+
+# 通用标签
+labels:
+  - pairs:
+      app: ips
+      managed-by: kustomize
+
+# 通用注解
+commonAnnotations:
+  project: "Image Prewarm Service"
+  version: "v1.0.0"
+
+# 资源列表
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - configmap.yaml
+  - deployment.yaml
+  - service.yaml
+  - ingress.yaml
+  - hpa.yaml
+  - pdb.yaml
+  - resource-quota.yaml
+
+# 镜像配置
+images:
+  - name: ips-apiserver
+    newName: ips-apiserver
+    newTag: latest
+# ConfigMap 生成器（可选，用于从文件生成 ConfigMap）
+# configMapGenerator:
+#   - name: ips-config
+#     files:
+#       - config.yaml
+
+# Secret 生成器（可选）
+# secretGenerator:
+#   - name: ips-secret
+#     literals:
+#       - token=secret-value
+
+# 资源配置补丁（可选）
+# patchesStrategicMerge:
+#   - patch-deployment.yaml

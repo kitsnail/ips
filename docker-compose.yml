@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  ips-apiserver:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ips-apiserver:latest
+    container_name: ips-apiserver
+    ports:
+      - "8080:8080"
+    environment:
+      # 服务端口
+      - SERVER_PORT=8080
+
+      # K8s 命名空间
+      - K8S_NAMESPACE=default
+
+      # Worker 镜像（用于创建预热 Job）
+      - WORKER_IMAGE=busybox:latest
+
+      # 日志级别
+      - LOG_LEVEL=info
+
+    # 挂载 kubeconfig（如果在集群外运行）
+    # 注意：在集群内运行时，会自动使用 ServiceAccount
+    volumes:
+      - ~/.kube/config:/home/ips/.kube/config:ro
+
+    restart: unless-stopped
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+    networks:
+      - ips-network
+
+networks:
+  ips-network:
+    driver: bridge

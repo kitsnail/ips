@@ -1,0 +1,32 @@
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ips-apiserver
+  namespace: ips-system
+  labels:
+    app: ips
+    component: apiserver
+  annotations:
+    # Nginx Ingress 配置示例
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    # 如果需要 HTTPS，可以配置证书
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: ips.example.com  # 修改为实际域名
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ips-apiserver
+                port:
+                  name: http
+  # 如果使用 HTTPS
+  # tls:
+  #   - hosts:
+  #       - ips.example.com
+  #     secretName: ips-tls
