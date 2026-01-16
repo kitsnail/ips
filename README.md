@@ -348,6 +348,17 @@ make docker-compose-up
 make docker-compose-down
 ```
 
+- push
+```bash
+skopeo copy \
+  --override-os linux \
+  --override-arch arm64 \
+  --dest-tls-verify=false \
+  --dest-creds admin:Harbor12345 \
+  docker-daemon:ips-apiserver:latest \
+  docker://cr01.home.lan/library/ips-apiserver:latest
+```
+
 ### Kubernetes 相关
 
 ```bash

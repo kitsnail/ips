@@ -23,6 +23,7 @@ func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager) *gin.E
 	healthHandler := handler.NewHealthHandler()
 
 	// 健康检查端点（不需要认证）
+	router.GET("/health", healthHandler.HealthCheck)
 	router.GET("/healthz", healthHandler.HealthCheck)
 	router.GET("/readyz", healthHandler.ReadyCheck)
 

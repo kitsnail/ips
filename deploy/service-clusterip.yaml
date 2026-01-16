@@ -1,4 +1,5 @@
 ---
+# ClusterIP Service - 用于 Ingress 或集群内访问
 apiVersion: v1
 kind: Service
 metadata:
@@ -7,12 +8,8 @@ metadata:
   labels:
     app: ips
     component: apiserver
-  annotations:
-    # MetalLB 注解（可选）
-    # metallb.universe.tf/address-pool: default
-    # metallb.universe.tf/loadBalancerIPs: 192.168.3.106
 spec:
-  type: LoadBalancer
+  type: ClusterIP
   selector:
     app: ips
     component: apiserver
@@ -22,10 +19,7 @@ spec:
       targetPort: http
       protocol: TCP
   # 会话亲和性：确保来自同一客户端的请求路由到同一个 Pod
-  # 这对于使用内存存储的多副本部署很重要
   sessionAffinity: ClientIP
   sessionAffinityConfig:
     clientIP:
       timeoutSeconds: 10800  # 3 小时
-  # 可选：指定外部流量策略
-  externalTrafficPolicy: Cluster

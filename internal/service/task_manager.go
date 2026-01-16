@@ -165,7 +165,29 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 		return m.markTaskFailed(ctx, task, fmt.Errorf("batch execution failed: %w", err))
 	}
 
-	m.logger.WithField("taskId", task.ID).Info("Task execution completed")
+	// 标记任务完成
+	updatedTask, getErr := m.repo.Get(ctx, task.ID)
+	if getErr != nil {
+		m.logger.WithFields(logrus.Fields{
+			"taskId": task.ID,
+			"error":  getErr,
+		}).Error("Failed to get task for completion")
+		return getErr
+	}
+
+	updatedTask.Status = models.TaskCompleted
+	completedAt := time.Now()
+	updatedTask.FinishedAt = &completedAt
+
+	if updateErr := m.repo.Update(ctx, updatedTask); updateErr != nil {
+		m.logger.WithFields(logrus.Fields{
+			"taskId": updatedTask.ID,
+			"error":  updateErr,
+		}).Error("Failed to update task status to completed")
+		return updateErr
+	}
+
+	m.logger.WithField("taskId", updatedTask.ID).Info("Task execution completed")
 	return nil
 }
 

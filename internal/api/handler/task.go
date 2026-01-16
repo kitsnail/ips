@@ -140,9 +140,13 @@ func (h *TaskHandler) CancelTask(c *gin.Context) {
 		}
 
 		// 检查是否是任务已完成的错误
-		if err.Error() == "task already finished" {
+		errMsg := err.Error()
+		if errMsg == "task already finished" ||
+		   // 匹配 "task already finished with status: xxx" 格式
+		   len(errMsg) > 26 && errMsg[:26] == "task already finished with" {
 			c.JSON(http.StatusConflict, gin.H{
-				"error": err.Error(),
+				"error":   "Cannot cancel task",
+				"message": err.Error(),
 			})
 			return
 		}

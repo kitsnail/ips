@@ -8,7 +8,7 @@ metadata:
     app: ips
     component: apiserver
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: ips
@@ -26,8 +26,8 @@ spec:
         fsGroup: 1000
       containers:
         - name: apiserver
-          image: ips-apiserver:latest
-          imagePullPolicy: IfNotPresent
+          image: 192.168.3.81/library/ips-apiserver:latest
+          imagePullPolicy: Always
           ports:
             - name: http
               containerPort: 8080

@@ -154,6 +154,103 @@ kubectl apply -f deploy/pdb.yaml
 | `WORKER_IMAGE` | 预热 Job 使用的镜像 | `busybox:latest` |
 | `LOG_LEVEL` | 日志级别 (debug/info/warn/error) | `info` |
 
+### Service 类型选择
+
+项目提供两种 Service 配置方式：
+
+#### 1. LoadBalancer (默认，使用 MetalLB)
+
+**文件**: `deploy/service.yaml`
+
+```yaml
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8080
+      targetPort: http
+```
+
+**特点**：
+- 自动分配外部 IP（通过 MetalLB）
+- 直接从集群外部访问
+- 不需要 Ingress Controller
+- 适合内网环境或简单部署
+
+**访问方式**：
+```bash
+# 获取外部 IP
+kubectl get svc ips-apiserver -n ips-system
+
+# 直接访问
+curl http://<EXTERNAL-IP>:8080/health
+```
+
+**重要提示 - 多副本部署注意事项**：
+
+当前版本使用**内存存储**，在多副本部署时需要配置会话亲和性（Session Affinity），确保同一客户端的请求总是路由到同一个 Pod。
+
+Service 配置已包含会话亲和性：
+```yaml
+sessionAffinity: ClientIP
+sessionAffinityConfig:
+  clientIP:
+    timeoutSeconds: 10800  # 3 小时
+```
+
+如果遇到任务查询不一致的问题（创建成功但查询失败），可以：
+1. 检查 Service 的会话亲和性配置是否生效
+2. 临时减少副本数到 1：`kubectl scale deployment/ips-apiserver -n ips-system --replicas=1`
+3. 长期方案：实现 Redis 或数据库存储替代内存存储
+
+**配置 IP 地址池（可选）**：
+
+编辑 `deploy/service.yaml`，取消注释以下行：
+```yaml
+annotations:
+  metallb.universe.tf/address-pool: default
+  # metallb.universe.tf/loadBalancerIPs: 192.168.3.106  # 指定固定 IP
+```
+
+#### 2. ClusterIP (配合 Ingress 使用)
+
+**文件**: `deploy/service-clusterip.yaml`
+
+```yaml
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8080
+      targetPort: http
+```
+
+**特点**：
+- 仅集群内部可访问
+- 需要配合 Ingress Controller 使用
+- 支持域名访问和 HTTPS
+- 适合需要高级路由功能的场景
+
+**使用方式**：
+```bash
+# 删除 LoadBalancer Service
+kubectl delete -f deploy/service.yaml
+
+# 应用 ClusterIP Service
+kubectl apply -f deploy/service-clusterip.yaml
+
+# 配置并应用 Ingress
+kubectl apply -f deploy/ingress.yaml
+```
+
+**访问方式**：
+```bash
+# 通过 Ingress 域名访问
+curl http://ips.example.com/health
+
+# 或通过端口转发测试
+kubectl port-forward svc/ips-apiserver -n ips-system 8080:8080
+curl http://localhost:8080/health
+```
+
 ### ConfigMap 配置
 
 编辑 `deploy/configmap.yaml` 修改配置：
