@@ -7,17 +7,22 @@ import (
 	"time"
 
 	"github.com/kitsnail/ips/internal/repository"
+	"github.com/kitsnail/ips/pkg/metrics"
 	"github.com/kitsnail/ips/pkg/models"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 )
 
 // TaskManager 任务管理器
 type TaskManager struct {
-	repo           repository.TaskRepository
-	nodeFilter     *NodeFilter
-	batchScheduler *BatchScheduler
-	statusTracker  *StatusTracker
-	logger         *logrus.Logger
+	repo            repository.TaskRepository
+	nodeFilter      *NodeFilter
+	batchScheduler  *BatchScheduler
+	statusTracker   *StatusTracker
+	webhookNotifier *WebhookNotifier
+	logger          *logrus.Logger
+	concurrencySem  *semaphore.Weighted // 并发控制信号量
+	maxConcurrency  int64               // 最大并发任务数
 
 	// 用于存储任务的取消函数
 	taskContexts sync.Map // map[string]context.CancelFunc
@@ -31,12 +36,24 @@ func NewTaskManager(
 	statusTracker *StatusTracker,
 	logger *logrus.Logger,
 ) *TaskManager {
+	// 默认最大并发任务数为 3
+	maxConcurrency := int64(3)
+	// 可以通过环境变量配置
+	// if envMax := os.Getenv("MAX_CONCURRENT_TASKS"); envMax != "" {
+	//     if max, err := strconv.ParseInt(envMax, 10, 64); err == nil && max > 0 {
+	//         maxConcurrency = max
+	//     }
+	// }
+
 	return &TaskManager{
-		repo:           repo,
-		nodeFilter:     nodeFilter,
-		batchScheduler: batchScheduler,
-		statusTracker:  statusTracker,
-		logger:         logger,
+		repo:            repo,
+		nodeFilter:      nodeFilter,
+		batchScheduler:  batchScheduler,
+		statusTracker:   statusTracker,
+		webhookNotifier: NewWebhookNotifier(logger),
+		logger:          logger,
+		concurrencySem:  semaphore.NewWeighted(maxConcurrency),
+		maxConcurrency:  maxConcurrency,
 	}
 }
 
@@ -45,14 +62,37 @@ func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequ
 	// 生成任务ID
 	taskID := models.GenerateTaskID()
 
+	// 设置默认优先级
+	priority := req.Priority
+	if priority == 0 {
+		priority = 5 // 默认优先级为 5
+	}
+
+	// 设置重试配置默认值
+	retryStrategy := req.RetryStrategy
+	if retryStrategy == "" {
+		retryStrategy = "linear"
+	}
+
+	retryDelay := req.RetryDelay
+	if retryDelay == 0 {
+		retryDelay = 30 // 默认30秒
+	}
+
 	// 创建任务对象
 	task := &models.Task{
-		ID:           taskID,
-		Status:       models.TaskPending,
-		Images:       req.Images,
-		BatchSize:    req.BatchSize,
-		NodeSelector: req.NodeSelector,
-		CreatedAt:    time.Now(),
+		ID:            taskID,
+		Status:        models.TaskPending,
+		Priority:      priority,
+		Images:        req.Images,
+		BatchSize:     req.BatchSize,
+		NodeSelector:  req.NodeSelector,
+		MaxRetries:    req.MaxRetries,
+		RetryCount:    0,
+		RetryStrategy: retryStrategy,
+		RetryDelay:    retryDelay,
+		WebhookURL:    req.WebhookURL,
+		CreatedAt:     time.Now(),
 	}
 
 	// 保存任务
@@ -61,14 +101,36 @@ func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequ
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
 
+	// 记录指标
+	metrics.TasksTotal.WithLabelValues(string(models.TaskPending)).Inc()
+	metrics.ActiveTasks.Inc()
+
 	m.logger.WithFields(logrus.Fields{
-		"taskId":    task.ID,
-		"images":    task.Images,
-		"batchSize": task.BatchSize,
+		"taskId":        task.ID,
+		"priority":      task.Priority,
+		"images":        task.Images,
+		"batchSize":     task.BatchSize,
+		"maxRetries":    task.MaxRetries,
+		"retryStrategy": task.RetryStrategy,
 	}).Info("Task created")
 
 	// 在后台执行任务
 	go func() {
+		// 等待获取并发槽位
+		if err := m.concurrencySem.Acquire(context.Background(), 1); err != nil {
+			m.logger.WithFields(logrus.Fields{
+				"taskId": task.ID,
+				"error":  err,
+			}).Error("Failed to acquire concurrency slot")
+			return
+		}
+		defer m.concurrencySem.Release(1)
+
+		m.logger.WithFields(logrus.Fields{
+			"taskId":         task.ID,
+			"maxConcurrency": m.maxConcurrency,
+		}).Info("Task acquired execution slot")
+
 		ctx, cancel := context.WithCancel(context.Background())
 		m.taskContexts.Store(task.ID, cancel)
 		defer m.taskContexts.Delete(task.ID)
@@ -88,14 +150,17 @@ func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequ
 func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error {
 	m.logger.WithField("taskId", task.ID).Info("Starting task execution")
 
+	// 记录任务开始时间
+	startTime := time.Now()
+
 	// 1. 获取符合条件的节点
 	nodes, err := m.nodeFilter.FilterNodes(ctx, task.NodeSelector)
 	if err != nil {
-		return m.markTaskFailed(ctx, task, fmt.Errorf("failed to filter nodes: %w", err))
+		return m.markTaskFailed(ctx, task, fmt.Errorf("failed to filter nodes: %w", err), startTime)
 	}
 
 	if len(nodes) == 0 {
-		return m.markTaskFailed(ctx, task, fmt.Errorf("no ready nodes found"))
+		return m.markTaskFailed(ctx, task, fmt.Errorf("no ready nodes found"), startTime)
 	}
 
 	m.logger.WithFields(logrus.Fields{
@@ -106,7 +171,7 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 	// 2. 初始化进度
 	totalBatches, err := m.batchScheduler.CalculateBatches(len(nodes), task.BatchSize)
 	if err != nil {
-		return m.markTaskFailed(ctx, task, err)
+		return m.markTaskFailed(ctx, task, err, startTime)
 	}
 
 	task.Progress = &models.Progress{
@@ -125,6 +190,9 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 	if err := m.repo.Update(ctx, task); err != nil {
 		return fmt.Errorf("failed to update task: %w", err)
 	}
+
+	// 记录任务状态变更指标
+	metrics.TasksTotal.WithLabelValues(string(models.TaskRunning)).Inc()
 
 	// 3. 启动状态跟踪器
 	go func() {
@@ -152,17 +220,31 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 				"failed":    failed,
 			}).Info("Batch completed")
 
-			// 更新当前批次
+			// 记录节点处理指标
+			metrics.NodesProcessed.WithLabelValues("success").Add(float64(succeeded))
+			metrics.NodesProcessed.WithLabelValues("failed").Add(float64(failed))
+
+			// 更新当前批次和进度
 			task, err := m.repo.Get(ctx, task.ID)
 			if err == nil && task.Progress != nil {
 				task.Progress.CurrentBatch = batchNum
+				task.Progress.CompletedNodes += succeeded
+				task.Progress.FailedNodes += failed
+				task.CalculateProgress()
 				m.repo.Update(ctx, task)
+
+				m.logger.WithFields(logrus.Fields{
+					"taskId":         task.ID,
+					"completedNodes": task.Progress.CompletedNodes,
+					"failedNodes":    task.Progress.FailedNodes,
+					"percentage":     task.Progress.Percentage,
+				}).Info("Progress updated")
 			}
 		},
 	)
 
 	if err != nil {
-		return m.markTaskFailed(ctx, task, fmt.Errorf("batch execution failed: %w", err))
+		return m.markTaskFailed(ctx, task, fmt.Errorf("batch execution failed: %w", err), startTime)
 	}
 
 	// 标记任务完成
@@ -187,12 +269,103 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 		return updateErr
 	}
 
+	// 记录任务完成指标
+	duration := time.Since(startTime).Seconds()
+	metrics.TasksTotal.WithLabelValues(string(models.TaskCompleted)).Inc()
+	metrics.TaskDuration.WithLabelValues(string(models.TaskCompleted)).Observe(duration)
+	metrics.ActiveTasks.Dec()
+	metrics.ImagesPulled.Add(float64(len(task.Images) * len(nodes)))
+
+	// 发送 Webhook 通知
+	if err := m.webhookNotifier.NotifyTaskCompleted(ctx, updatedTask); err != nil {
+		m.logger.WithFields(logrus.Fields{
+			"taskId": updatedTask.ID,
+			"error":  err,
+		}).Warn("Failed to send webhook notification for completed task")
+	}
+
 	m.logger.WithField("taskId", updatedTask.ID).Info("Task execution completed")
 	return nil
 }
 
-// markTaskFailed 标记任务失败
-func (m *TaskManager) markTaskFailed(ctx context.Context, task *models.Task, err error) error {
+// markTaskFailed 标记任务失败或触发重试
+func (m *TaskManager) markTaskFailed(ctx context.Context, task *models.Task, err error, startTime time.Time) error {
+	// 检查是否可以重试
+	if task.RetryCount < task.MaxRetries {
+		// 增加重试计数
+		task.RetryCount++
+
+		// 获取重试策略
+		retryStrategy := GetRetryStrategy(task.RetryStrategy, m.logger)
+		delay := retryStrategy.CalculateDelay(task.RetryCount, task.RetryDelay)
+
+		m.logger.WithFields(logrus.Fields{
+			"taskId":     task.ID,
+			"retryCount": task.RetryCount,
+			"maxRetries": task.MaxRetries,
+			"delay":      delay.Seconds(),
+			"error":      err,
+		}).Info("Task failed, scheduling retry")
+
+		// 更新任务状态为 pending 以准备重试
+		task.Status = models.TaskPending
+		task.FinishedAt = nil // 清除完成时间
+
+		if updateErr := m.repo.Update(ctx, task); updateErr != nil {
+			m.logger.WithFields(logrus.Fields{
+				"taskId": task.ID,
+				"error":  updateErr,
+			}).Error("Failed to update task for retry")
+		}
+
+		// 等待重试延迟后重新执行任务
+		go func() {
+			time.Sleep(delay)
+
+			m.logger.WithFields(logrus.Fields{
+				"taskId":     task.ID,
+				"retryCount": task.RetryCount,
+			}).Info("Retrying task")
+
+			// 重新获取任务确保获取最新状态
+			latestTask, getErr := m.repo.Get(context.Background(), task.ID)
+			if getErr != nil {
+				m.logger.WithFields(logrus.Fields{
+					"taskId": task.ID,
+					"error":  getErr,
+				}).Error("Failed to get task for retry")
+				return
+			}
+
+			// 检查任务是否被取消
+			if latestTask.Status == models.TaskCancelled {
+				m.logger.WithField("taskId", task.ID).Info("Task was cancelled, skipping retry")
+				return
+			}
+
+			// 重新执行任务
+			ctx, cancel := context.WithCancel(context.Background())
+			m.taskContexts.Store(task.ID, cancel)
+			defer m.taskContexts.Delete(task.ID)
+
+			if execErr := m.executeTask(ctx, latestTask); execErr != nil {
+				m.logger.WithFields(logrus.Fields{
+					"taskId": task.ID,
+					"error":  execErr,
+				}).Error("Task retry failed")
+			}
+		}()
+
+		return err
+	}
+
+	// 达到最大重试次数，标记为失败
+	m.logger.WithFields(logrus.Fields{
+		"taskId":     task.ID,
+		"retryCount": task.RetryCount,
+		"error":      err,
+	}).Error("Task failed after max retries")
+
 	task.Status = models.TaskFailed
 	now := time.Now()
 	task.FinishedAt = &now
@@ -202,6 +375,20 @@ func (m *TaskManager) markTaskFailed(ctx context.Context, task *models.Task, err
 			"taskId": task.ID,
 			"error":  updateErr,
 		}).Error("Failed to update task status to failed")
+	}
+
+	// 记录任务失败指标
+	duration := time.Since(startTime).Seconds()
+	metrics.TasksTotal.WithLabelValues(string(models.TaskFailed)).Inc()
+	metrics.TaskDuration.WithLabelValues(string(models.TaskFailed)).Observe(duration)
+	metrics.ActiveTasks.Dec()
+
+	// 发送 Webhook 通知
+	if webhookErr := m.webhookNotifier.NotifyTaskFailed(ctx, task); webhookErr != nil {
+		m.logger.WithFields(logrus.Fields{
+			"taskId": task.ID,
+			"error":  webhookErr,
+		}).Warn("Failed to send webhook notification for failed task")
 	}
 
 	return err
@@ -245,6 +432,22 @@ func (m *TaskManager) CancelTask(ctx context.Context, id string) error {
 	err = m.repo.Update(ctx, task)
 	if err != nil {
 		return fmt.Errorf("failed to update task: %w", err)
+	}
+
+	// 记录任务取消指标
+	if task.StartedAt != nil {
+		duration := time.Since(*task.StartedAt).Seconds()
+		metrics.TaskDuration.WithLabelValues(string(models.TaskCancelled)).Observe(duration)
+	}
+	metrics.TasksTotal.WithLabelValues(string(models.TaskCancelled)).Inc()
+	metrics.ActiveTasks.Dec()
+
+	// 发送 Webhook 通知
+	if webhookErr := m.webhookNotifier.NotifyTaskCancelled(ctx, task); webhookErr != nil {
+		m.logger.WithFields(logrus.Fields{
+			"taskId": id,
+			"error":  webhookErr,
+		}).Warn("Failed to send webhook notification for cancelled task")
 	}
 
 	m.logger.WithField("taskId", id).Info("Task cancelled")

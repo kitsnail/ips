@@ -18,7 +18,7 @@ type JobCreator struct {
 // NewJobCreator 创建Job创建器
 func NewJobCreator(client *Client, workerImage string) *JobCreator {
 	if workerImage == "" {
-		workerImage = "busybox:latest"
+		workerImage = "registry.k8s.io/pause"
 	}
 
 	return &JobCreator{
@@ -47,8 +47,8 @@ func (j *JobCreator) CreateJob(ctx context.Context, taskID, nodeName string, ima
 		})
 	}
 
-	// TTL设置：Job完成后1小时自动清理
-	ttl := int32(3600)
+	// TTL设置：Job完成后15分钟自动清理
+	ttl := int32(900)
 	backoffLimit := int32(3) // 失败重试3次
 
 	job := &batchv1.Job{
@@ -130,4 +130,9 @@ func (j *JobCreator) ListJobsByTaskID(ctx context.Context, taskID string) ([]bat
 	}
 
 	return jobList.Items, nil
+}
+
+// GetK8sClient 获取K8s客户端（用于Watch等高级功能）
+func (j *JobCreator) GetK8sClient() *Client {
+	return j.client
 }

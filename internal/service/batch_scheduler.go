@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/kitsnail/ips/internal/k8s"
+	"github.com/kitsnail/ips/pkg/metrics"
 	"github.com/sirupsen/logrus"
 )
 
@@ -57,8 +58,15 @@ func (s *BatchScheduler) ExecuteBatches(
 			"batchSize": len(batch),
 		}).Info("Executing batch")
 
+		// 记录批次执行开始时间
+		batchStartTime := time.Now()
+
 		// 为批次中的每个节点创建Job
 		succeeded, failed := s.executeBatch(ctx, taskID, batch, images)
+
+		// 记录批次执行耗时
+		batchDuration := time.Since(batchStartTime).Seconds()
+		metrics.BatchExecutionDuration.Observe(batchDuration)
 
 		s.logger.WithFields(logrus.Fields{
 			"taskId":    taskID,
@@ -97,8 +105,10 @@ func (s *BatchScheduler) executeBatch(ctx context.Context, taskID string, nodes 
 				"error":    err,
 			}).Error("Failed to create job")
 			failed++
+			metrics.JobCreationTotal.WithLabelValues("failed").Inc()
 		} else {
 			succeeded++
+			metrics.JobCreationTotal.WithLabelValues("success").Inc()
 		}
 	}
 

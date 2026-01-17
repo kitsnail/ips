@@ -38,6 +38,9 @@ WORKDIR /app
 # 从构建阶段复制二进制文件
 COPY --from=builder /build/bin/apiserver /app/apiserver
 
+# 复制 Web UI 静态文件
+COPY --from=builder /build/web /app/web
+
 # 修改文件权限
 RUN chown -R ips:ips /app
 

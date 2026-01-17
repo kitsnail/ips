@@ -12,7 +12,7 @@ import (
 
 // Client K8s客户端封装
 type Client struct {
-	Clientset *kubernetes.Clientset
+	Clientset kubernetes.Interface
 	Config    *rest.Config
 	Namespace string
 }
@@ -21,7 +21,12 @@ type Client struct {
 // 优先使用in-cluster配置，如果失败则使用kubeconfig
 func NewClient(namespace string) (*Client, error) {
 	if namespace == "" {
-		namespace = "default"
+		// 尝试从Pod内读取当前namespace
+		if ns, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace"); err == nil {
+			namespace = string(ns)
+		} else {
+			namespace = "default"
+		}
 	}
 
 	// 尝试in-cluster配置

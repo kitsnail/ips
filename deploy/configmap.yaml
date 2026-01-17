@@ -12,7 +12,7 @@ data:
   SERVER_PORT: "8080"
 
   # K8s 命名空间（IPS 将在此命名空间创建 Job）
-  K8S_NAMESPACE: "default"
+  K8S_NAMESPACE: "ips-system"
 
   # Worker 镜像（用于创建预热 Job）
   WORKER_IMAGE: "busybox:latest"

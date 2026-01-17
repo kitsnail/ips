@@ -4,17 +4,29 @@
 
 ## 功能特性
 
+### 核心功能
 - ✅ RESTful API 接口，易于集成
+- ✅ **Web UI 管理界面**（可视化任务管理）
 - ✅ 批次调度，支持自定义批次大小
 - ✅ 节点选择器，支持按标签过滤节点
-- ✅ 实时进度跟踪
+- ✅ 实时进度跟踪（基于 Kubernetes Watch 机制）
 - ✅ 失败节点详情记录
 - ✅ 任务生命周期管理（创建、查询、取消）
-- ✅ 内存存储（MVP）
+
+### 高级特性
+- ✅ **任务优先级队列**（1-10 级，支持紧急任务优先执行）
+- ✅ **自动重试机制**（支持线性和指数退避策略）
+- ✅ **Webhook 通知**（任务完成/失败/取消自动通知）
+- ✅ **并发控制**（防止资源耗尽，默认最大 3 个并发任务）
+- ✅ **Prometheus 监控指标**（任务统计、耗时、节点处理等 9 种指标）
+
+### 部署与运维
+- ✅ 内存存储（轻量级，适合短期任务）
 - ✅ Docker 容器化支持
-- ✅ Kubernetes 部署配置
+- ✅ Kubernetes 完整部署配置
 - ✅ 水平自动扩缩容（HPA）
 - ✅ 健康检查和优雅关闭
+- ✅ 完善的单元测试和集成测试
 
 ## 快速开始
 
@@ -54,6 +66,28 @@ SERVER_PORT=8080 K8S_NAMESPACE=default WORKER_IMAGE=busybox:latest ./bin/apiserv
 # 或手动测试
 curl http://localhost:8080/health
 ```
+
+### 使用 Web UI
+
+服务启动后，可以通过浏览器访问 Web 管理界面：
+
+```
+http://localhost:8080/
+或
+http://localhost:8080/web/
+```
+
+Web UI 功能：
+- 📊 **任务列表视图** - 实时查看所有任务状态和进度
+- ➕ **创建任务** - 可视化表单创建新的镜像预热任务
+- 🔍 **任务详情** - 查看任务完整信息、进度和失败节点详情
+- 🎯 **状态筛选** - 按任务状态快速筛选
+- ❌ **取消任务** - 一键取消运行中的任务
+- 🔄 **自动刷新** - 每 5 秒自动更新任务状态
+
+### 使用 API
+
+查看 [API 文档](#api-文档) 了解如何通过 RESTful API 管理任务。
 
 ### 方式二：Docker 部署
 
@@ -125,8 +159,13 @@ Content-Type: application/json
 {
   "images": ["nginx:latest", "redis:7"],
   "batchSize": 10,
-  "nodeSelector": {
-    "workload": "compute"  # 可选
+  "priority": 5,              # 可选，优先级 1-10，默认 5
+  "maxRetries": 3,            # 可选，最大重试次数 0-5，默认 0
+  "retryStrategy": "linear",  # 可选，重试策略: linear 或 exponential，默认 linear
+  "retryDelay": 30,           # 可选，重试延迟（秒），默认 30
+  "webhookUrl": "https://example.com/webhook",  # 可选，任务完成通知
+  "nodeSelector": {           # 可选，节点选择器
+    "workload": "compute"
   }
 }
 ```
@@ -137,8 +176,12 @@ Content-Type: application/json
 {
   "taskId": "task-20260116-151234-a1b2c3d4",
   "status": "pending",
+  "priority": 5,
   "images": ["nginx:latest", "redis:7"],
   "batchSize": 10,
+  "maxRetries": 3,
+  "retryCount": 0,
+  "retryStrategy": "linear",
   "createdAt": "2026-01-16T15:12:34Z"
 }
 ```

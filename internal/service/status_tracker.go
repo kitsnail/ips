@@ -10,6 +10,8 @@ import (
 	"github.com/kitsnail/ips/pkg/models"
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 )
 
 // StatusTracker 状态跟踪器
@@ -29,12 +31,139 @@ func NewStatusTracker(repo repository.TaskRepository, jobCreator *k8s.JobCreator
 }
 
 // TrackTask 跟踪任务状态
-// 使用轮询方式定期检查Job状态
+// 优先使用Watch机制，失败时降级到轮询
 func (t *StatusTracker) TrackTask(ctx context.Context, taskID string) error {
+	t.logger.WithField("taskId", taskID).Info("Starting task tracking")
+
+	// 尝试使用Watch机制
+	err := t.trackTaskWithWatch(ctx, taskID)
+	if err != nil {
+		t.logger.WithFields(logrus.Fields{
+			"taskId": taskID,
+			"error":  err,
+		}).Warn("Watch mechanism failed, falling back to polling")
+		// 降级到轮询
+		return t.trackTaskWithPolling(ctx, taskID)
+	}
+
+	return nil
+}
+
+// trackTaskWithWatch 使用Watch机制跟踪任务
+func (t *StatusTracker) trackTaskWithWatch(ctx context.Context, taskID string) error {
+	// 创建Watch
+	labelSelector := fmt.Sprintf("task-id=%s", taskID)
+	watchInterface, err := t.jobCreator.GetK8sClient().Clientset.BatchV1().Jobs(t.jobCreator.GetK8sClient().Namespace).Watch(
+		ctx,
+		metav1.ListOptions{
+			LabelSelector: labelSelector,
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("failed to create watch: %w", err)
+	}
+	defer watchInterface.Stop()
+
+	t.logger.WithField("taskId", taskID).Info("Using Watch mechanism for task tracking")
+
+	// 定期更新任务状态（每30秒或收到事件时）
+	updateTicker := time.NewTicker(30 * time.Second)
+	defer updateTicker.Stop()
+
+	// 监听Job变化
+	for {
+		select {
+		case event, ok := <-watchInterface.ResultChan():
+			if !ok {
+				return fmt.Errorf("watch channel closed")
+			}
+
+			// 处理事件
+			if event.Type == watch.Added || event.Type == watch.Modified || event.Type == watch.Deleted {
+				t.logger.WithFields(logrus.Fields{
+					"taskId":    taskID,
+					"eventType": event.Type,
+				}).Debug("Received Job event")
+
+				// 获取任务并更新状态
+				task, err := t.repo.Get(ctx, taskID)
+				if err != nil {
+					t.logger.WithFields(logrus.Fields{
+						"taskId": taskID,
+						"error":  err,
+					}).Error("Failed to get task")
+					continue
+				}
+
+				// 检查任务是否已结束
+				if t.isTaskFinished(task) {
+					t.logger.WithFields(logrus.Fields{
+						"taskId": taskID,
+						"status": task.Status,
+					}).Info("Task tracking completed via Watch")
+					return nil
+				}
+
+				// 更新任务状态
+				if err := t.updateTaskStatus(ctx, task); err != nil {
+					t.logger.WithFields(logrus.Fields{
+						"taskId": taskID,
+						"error":  err,
+					}).Error("Failed to update task status")
+				}
+
+				// 再次检查是否完成
+				task, _ = t.repo.Get(ctx, taskID)
+				if task != nil && t.isTaskFinished(task) {
+					t.logger.WithFields(logrus.Fields{
+						"taskId": taskID,
+						"status": task.Status,
+					}).Info("Task tracking completed via Watch")
+					return nil
+				}
+			}
+
+		case <-updateTicker.C:
+			// 定期更新（即使没有事件）
+			task, err := t.repo.Get(ctx, taskID)
+			if err != nil {
+				t.logger.WithFields(logrus.Fields{
+					"taskId": taskID,
+					"error":  err,
+				}).Error("Failed to get task during periodic update")
+				continue
+			}
+
+			// 检查任务是否已结束
+			if t.isTaskFinished(task) {
+				t.logger.WithFields(logrus.Fields{
+					"taskId": taskID,
+					"status": task.Status,
+				}).Info("Task tracking completed")
+				return nil
+			}
+
+			// 更新任务状态
+			if err := t.updateTaskStatus(ctx, task); err != nil {
+				t.logger.WithFields(logrus.Fields{
+					"taskId": taskID,
+					"error":  err,
+				}).Error("Failed to update task status during periodic update")
+			}
+
+		case <-ctx.Done():
+			t.logger.WithField("taskId", taskID).Warn("Task tracking cancelled")
+			return ctx.Err()
+		}
+	}
+}
+
+// trackTaskWithPolling 使用轮询方式跟踪任务（降级方案）
+func (t *StatusTracker) trackTaskWithPolling(ctx context.Context, taskID string) error {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
-	t.logger.WithField("taskId", taskID).Info("Starting task tracking")
+	t.logger.WithField("taskId", taskID).Info("Using polling for task tracking")
 
 	for {
 		select {
@@ -50,13 +179,11 @@ func (t *StatusTracker) TrackTask(ctx context.Context, taskID string) error {
 			}
 
 			// 如果任务已经完成/失败/取消，停止跟踪
-			if task.Status == models.TaskCompleted ||
-				task.Status == models.TaskFailed ||
-				task.Status == models.TaskCancelled {
+			if t.isTaskFinished(task) {
 				t.logger.WithFields(logrus.Fields{
 					"taskId": taskID,
 					"status": task.Status,
-				}).Info("Task tracking completed")
+				}).Info("Task tracking completed via polling")
 				return nil
 			}
 
@@ -74,6 +201,13 @@ func (t *StatusTracker) TrackTask(ctx context.Context, taskID string) error {
 			return ctx.Err()
 		}
 	}
+}
+
+// isTaskFinished 检查任务是否已结束
+func (t *StatusTracker) isTaskFinished(task *models.Task) bool {
+	return task.Status == models.TaskCompleted ||
+		task.Status == models.TaskFailed ||
+		task.Status == models.TaskCancelled
 }
 
 // updateTaskStatus 更新任务状态

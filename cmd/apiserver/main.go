@@ -45,7 +45,7 @@ func main() {
 	// 3. 初始化服务组件
 	workerImage := os.Getenv("WORKER_IMAGE")
 	if workerImage == "" {
-		workerImage = "busybox:latest"
+		workerImage = "registry.k8s.io/pause:3.10"
 	}
 
 	jobCreator := k8s.NewJobCreator(k8sClient, workerImage)

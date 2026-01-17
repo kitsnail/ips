@@ -5,6 +5,7 @@ import (
 	"github.com/kitsnail/ips/internal/api/handler"
 	"github.com/kitsnail/ips/internal/api/middleware"
 	"github.com/kitsnail/ips/internal/service"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 )
 
@@ -18,6 +19,13 @@ func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager) *gin.E
 	// 全局中间件
 	router.Use(middleware.RecoveryMiddleware(logger))
 	router.Use(middleware.LoggingMiddleware(logger))
+	router.Use(middleware.PrometheusMiddleware())
+
+	// 静态文件服务 (Web UI)
+	router.Static("/web", "./web/static")
+	router.GET("/", func(c *gin.Context) {
+		c.Redirect(302, "/web/")
+	})
 
 	// 健康检查处理器
 	healthHandler := handler.NewHealthHandler()
@@ -26,6 +34,9 @@ func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager) *gin.E
 	router.GET("/health", healthHandler.HealthCheck)
 	router.GET("/healthz", healthHandler.HealthCheck)
 	router.GET("/readyz", healthHandler.ReadyCheck)
+
+	// Prometheus 指标端点
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// 任务处理器
 	taskHandler := handler.NewTaskHandler(taskManager)
