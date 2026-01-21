@@ -16,18 +16,40 @@ var (
 
 // TaskRepository 任务存储接口
 type TaskRepository interface {
-	// Create 创建任务
-	Create(ctx context.Context, task *models.Task) error
+	// CreateTask 创建任务
+	CreateTask(ctx context.Context, task *models.Task) error
 
-	// Get 获取任务
-	Get(ctx context.Context, id string) (*models.Task, error)
+	// GetTask 获取任务
+	GetTask(ctx context.Context, id string) (*models.Task, error)
 
-	// List 列出任务
-	List(ctx context.Context, filter models.TaskFilter) ([]*models.Task, int, error)
+	// ListTasks 列出任务
+	ListTasks(ctx context.Context) ([]*models.Task, error)
 
-	// Update 更新任务
-	Update(ctx context.Context, task *models.Task) error
+	// UpdateTask 更新任务
+	UpdateTask(ctx context.Context, task *models.Task) error
 
-	// Delete 删除任务
-	Delete(ctx context.Context, id string) error
+	// DeleteTask 删除任务
+	DeleteTask(ctx context.Context, id string) error
+}
+
+// UserRepository 用户存储接口
+type UserRepository interface {
+	// CreateUser 创建用户
+	CreateUser(ctx context.Context, user *models.User) error
+	// GetUser 获取用户
+	GetUser(ctx context.Context, id int64) (*models.User, error)
+	// GetByUsername 按用户名获取用户
+	GetByUsername(ctx context.Context, username string) (*models.User, error)
+	// ListUsers 列出用户
+	ListUsers(ctx context.Context) ([]*models.User, error)
+	// UpdateUser 更新用户
+	UpdateUser(ctx context.Context, user *models.User) error
+	// DeleteUser 删除用户
+	DeleteUser(ctx context.Context, id int64) error
+
+	// APIToken 相关
+	CreateToken(ctx context.Context, token *models.APIToken) error
+	GetToken(ctx context.Context, tokenStr string) (*models.APIToken, error)
+	ListTokens(ctx context.Context, userID int64) ([]*models.APIToken, error)
+	DeleteToken(ctx context.Context, id int64) error
 }

@@ -21,6 +21,7 @@ resources:
   - ingress.yaml
   - hpa.yaml
   - pdb.yaml
+  - pvc.yaml
   - resource-quota.yaml
 
 # 镜像配置

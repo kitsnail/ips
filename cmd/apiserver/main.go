@@ -15,7 +15,9 @@ import (
 	"github.com/kitsnail/ips/internal/puller"
 	"github.com/kitsnail/ips/internal/repository"
 	"github.com/kitsnail/ips/internal/service"
+	"github.com/kitsnail/ips/pkg/models"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
@@ -53,9 +55,35 @@ func main() {
 	}
 	logger.Info("K8s client initialized")
 
-	// 2. 初始化存储层
-	repo := repository.NewMemoryRepository()
-	logger.Info("Repository initialized")
+	// 2. 初始化存储层 (SQLite)
+	dbPath := os.Getenv("SQLITE_DB_PATH")
+	if dbPath == "" {
+		dbPath = "ips.db"
+	}
+	repo, err := repository.NewSQLiteRepository(dbPath)
+	if err != nil {
+		logger.Fatalf("Failed to initialize SQLite repository: %v", err)
+	}
+	logger.Infof("SQLite Repository initialized at %s", dbPath)
+
+	// 初始化管理员用户
+	ctx := context.Background()
+	admin, err := repo.GetByUsername(ctx, "admin")
+	if err != nil {
+		logger.Errorf("Failed to check admin user: %v", err)
+	} else if admin == nil {
+		hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("admin123"), bcrypt.DefaultCost)
+		err = repo.CreateUser(ctx, &models.User{
+			Username: "admin",
+			Password: string(hashedPassword),
+			Role:     models.RoleAdmin,
+		})
+		if err != nil {
+			logger.Errorf("Failed to create default admin user: %v", err)
+		} else {
+			logger.Info("Default admin user created (admin/admin123)")
+		}
+	}
 
 	// 3. 初始化服务组件
 	workerImage := os.Getenv("WORKER_IMAGE")
@@ -80,7 +108,15 @@ func main() {
 
 	logger.Info("Service components initialized")
 
-	// 4. 初始化任务管理器
+	// 4. 初始化认证服务
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		jwtSecret = "ips-default-secret-change-me"
+		logger.Warn("JWT_SECRET not set, using default secret")
+	}
+	authService := service.NewAuthService(repo, k8sClient.Clientset, jwtSecret)
+
+	// 5. 初始化任务管理器
 	taskManager := service.NewTaskManager(
 		repo,
 		nodeFilter,
@@ -90,8 +126,8 @@ func main() {
 	)
 	logger.Info("Task manager initialized")
 
-	// 5. 设置路由
-	router := api.SetupRouter(logger, taskManager)
+	// 6. 设置路由
+	router := api.SetupRouter(logger, taskManager, authService, repo)
 
 	// 6. 创建HTTP服务器
 	port := os.Getenv("SERVER_PORT")

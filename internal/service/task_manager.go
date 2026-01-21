@@ -101,7 +101,7 @@ func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequ
 	}
 
 	// 保存任务
-	err := m.repo.Create(ctx, task)
+	err := m.repo.CreateTask(ctx, task)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create task: %w", err)
 	}
@@ -193,7 +193,7 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 	now := time.Now()
 	task.StartedAt = &now
 
-	if err := m.repo.Update(ctx, task); err != nil {
+	if err := m.repo.UpdateTask(ctx, task); err != nil {
 		return fmt.Errorf("failed to update task: %w", err)
 	}
 
@@ -216,7 +216,7 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 			}).Info("Batch submitted")
 			// 更新批次数进度
 			task.Progress.CurrentBatch = batchNum
-			m.repo.Update(ctx, task)
+			m.repo.UpdateTask(ctx, task)
 		},
 	)
 
@@ -257,7 +257,7 @@ func (m *TaskManager) markTaskFailed(ctx context.Context, task *models.Task, err
 		task.Status = models.TaskPending
 		task.FinishedAt = nil // 清除完成时间
 
-		if updateErr := m.repo.Update(ctx, task); updateErr != nil {
+		if updateErr := m.repo.UpdateTask(ctx, task); updateErr != nil {
 			m.logger.WithFields(logrus.Fields{
 				"taskId": task.ID,
 				"error":  updateErr,
@@ -274,7 +274,7 @@ func (m *TaskManager) markTaskFailed(ctx context.Context, task *models.Task, err
 			}).Info("Retrying task")
 
 			// 重新获取任务确保获取最新状态
-			latestTask, getErr := m.repo.Get(context.Background(), task.ID)
+			latestTask, getErr := m.repo.GetTask(context.Background(), task.ID)
 			if getErr != nil {
 				m.logger.WithFields(logrus.Fields{
 					"taskId": task.ID,
@@ -316,7 +316,7 @@ func (m *TaskManager) markTaskFailed(ctx context.Context, task *models.Task, err
 	now := time.Now()
 	task.FinishedAt = &now
 
-	if updateErr := m.repo.Update(ctx, task); updateErr != nil {
+	if updateErr := m.repo.UpdateTask(ctx, task); updateErr != nil {
 		m.logger.WithFields(logrus.Fields{
 			"taskId": task.ID,
 			"error":  updateErr,
@@ -342,18 +342,22 @@ func (m *TaskManager) markTaskFailed(ctx context.Context, task *models.Task, err
 
 // GetTask 获取任务
 func (m *TaskManager) GetTask(ctx context.Context, id string) (*models.Task, error) {
-	return m.repo.Get(ctx, id)
+	return m.repo.GetTask(ctx, id)
 }
 
 // ListTasks 列出任务
 func (m *TaskManager) ListTasks(ctx context.Context, filter models.TaskFilter) ([]*models.Task, int, error) {
-	return m.repo.List(ctx, filter)
+	tasks, err := m.repo.ListTasks(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	return tasks, len(tasks), nil
 }
 
 // CancelTask 取消任务
 func (m *TaskManager) CancelTask(ctx context.Context, id string) error {
 	// 获取任务
-	task, err := m.repo.Get(ctx, id)
+	task, err := m.repo.GetTask(ctx, id)
 	if err != nil {
 		return err
 	}
@@ -375,7 +379,7 @@ func (m *TaskManager) CancelTask(ctx context.Context, id string) error {
 	now := time.Now()
 	task.FinishedAt = &now
 
-	err = m.repo.Update(ctx, task)
+	err = m.repo.UpdateTask(ctx, task)
 	if err != nil {
 		return fmt.Errorf("failed to update task: %w", err)
 	}

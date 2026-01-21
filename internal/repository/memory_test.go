@@ -8,7 +8,7 @@ import (
 	"github.com/kitsnail/ips/pkg/models"
 )
 
-func TestMemoryRepository_Create(t *testing.T) {
+func TestMemoryRepository_CreateTask(t *testing.T) {
 	repo := NewMemoryRepository()
 	ctx := context.Background()
 
@@ -21,15 +21,15 @@ func TestMemoryRepository_Create(t *testing.T) {
 	}
 
 	// 测试创建任务
-	err := repo.Create(ctx, task)
+	err := repo.CreateTask(ctx, task)
 	if err != nil {
-		t.Fatalf("Create failed: %v", err)
+		t.Fatalf("CreateTask failed: %v", err)
 	}
 
 	// 验证任务已创建
-	retrieved, err := repo.Get(ctx, "test-task-1")
+	retrieved, err := repo.GetTask(ctx, "test-task-1")
 	if err != nil {
-		t.Fatalf("Get failed: %v", err)
+		t.Fatalf("GetTask failed: %v", err)
 	}
 
 	if retrieved.ID != task.ID {
@@ -54,24 +54,24 @@ func TestMemoryRepository_CreateDuplicate(t *testing.T) {
 	}
 
 	// 第一次创建应该成功
-	err := repo.Create(ctx, task)
+	err := repo.CreateTask(ctx, task)
 	if err != nil {
-		t.Fatalf("First Create failed: %v", err)
+		t.Fatalf("First CreateTask failed: %v", err)
 	}
 
 	// 第二次创建相同ID应该失败
-	err = repo.Create(ctx, task)
+	err = repo.CreateTask(ctx, task)
 	if err != ErrTaskAlreadyExists {
 		t.Errorf("Expected ErrTaskAlreadyExists, got %v", err)
 	}
 }
 
-func TestMemoryRepository_Get(t *testing.T) {
+func TestMemoryRepository_GetTask(t *testing.T) {
 	repo := NewMemoryRepository()
 	ctx := context.Background()
 
 	// 测试获取不存在的任务
-	_, err := repo.Get(ctx, "non-existent")
+	_, err := repo.GetTask(ctx, "non-existent")
 	if err != ErrTaskNotFound {
 		t.Errorf("Expected ErrTaskNotFound, got %v", err)
 	}
@@ -84,12 +84,12 @@ func TestMemoryRepository_Get(t *testing.T) {
 		BatchSize: 20,
 		CreatedAt: time.Now(),
 	}
-	repo.Create(ctx, task)
+	repo.CreateTask(ctx, task)
 
 	// 测试获取存在的任务
-	retrieved, err := repo.Get(ctx, "test-task-3")
+	retrieved, err := repo.GetTask(ctx, "test-task-3")
 	if err != nil {
-		t.Fatalf("Get failed: %v", err)
+		t.Fatalf("GetTask failed: %v", err)
 	}
 
 	if retrieved.ID != task.ID {
@@ -97,7 +97,7 @@ func TestMemoryRepository_Get(t *testing.T) {
 	}
 }
 
-func TestMemoryRepository_Update(t *testing.T) {
+func TestMemoryRepository_UpdateTask(t *testing.T) {
 	repo := NewMemoryRepository()
 	ctx := context.Background()
 
@@ -109,23 +109,23 @@ func TestMemoryRepository_Update(t *testing.T) {
 		BatchSize: 15,
 		CreatedAt: time.Now(),
 	}
-	repo.Create(ctx, task)
+	repo.CreateTask(ctx, task)
 
 	// 更新任务状态
 	task.Status = models.TaskRunning
-	err := repo.Update(ctx, task)
+	err := repo.UpdateTask(ctx, task)
 	if err != nil {
-		t.Fatalf("Update failed: %v", err)
+		t.Fatalf("UpdateTask failed: %v", err)
 	}
 
 	// 验证更新成功
-	retrieved, _ := repo.Get(ctx, "test-task-4")
+	retrieved, _ := repo.GetTask(ctx, "test-task-4")
 	if retrieved.Status != models.TaskRunning {
 		t.Errorf("Expected Status %s, got %s", models.TaskRunning, retrieved.Status)
 	}
 }
 
-func TestMemoryRepository_Delete(t *testing.T) {
+func TestMemoryRepository_DeleteTask(t *testing.T) {
 	repo := NewMemoryRepository()
 	ctx := context.Background()
 
@@ -137,22 +137,22 @@ func TestMemoryRepository_Delete(t *testing.T) {
 		BatchSize: 5,
 		CreatedAt: time.Now(),
 	}
-	repo.Create(ctx, task)
+	repo.CreateTask(ctx, task)
 
 	// 删除任务
-	err := repo.Delete(ctx, "test-task-5")
+	err := repo.DeleteTask(ctx, "test-task-5")
 	if err != nil {
-		t.Fatalf("Delete failed: %v", err)
+		t.Fatalf("DeleteTask failed: %v", err)
 	}
 
 	// 验证任务已删除
-	_, err = repo.Get(ctx, "test-task-5")
+	_, err = repo.GetTask(ctx, "test-task-5")
 	if err != ErrTaskNotFound {
 		t.Errorf("Expected ErrTaskNotFound after delete, got %v", err)
 	}
 }
 
-func TestMemoryRepository_List(t *testing.T) {
+func TestMemoryRepository_ListTasks(t *testing.T) {
 	repo := NewMemoryRepository()
 	ctx := context.Background()
 
@@ -182,41 +182,16 @@ func TestMemoryRepository_List(t *testing.T) {
 	}
 
 	for _, task := range tasks {
-		repo.Create(ctx, task)
+		repo.CreateTask(ctx, task)
 	}
 
 	// 测试列出所有任务
-	allTasks, total, err := repo.List(ctx, models.TaskFilter{})
+	allTasks, err := repo.ListTasks(ctx)
 	if err != nil {
-		t.Fatalf("List failed: %v", err)
-	}
-
-	if total != 3 {
-		t.Errorf("Expected total 3, got %d", total)
+		t.Fatalf("ListTasks failed: %v", err)
 	}
 
 	if len(allTasks) != 3 {
 		t.Errorf("Expected 3 tasks, got %d", len(allTasks))
-	}
-
-	// 测试按状态过滤
-	status := models.TaskRunning
-	filteredTasks, total, err := repo.List(ctx, models.TaskFilter{
-		Status: &status,
-	})
-	if err != nil {
-		t.Fatalf("List with filter failed: %v", err)
-	}
-
-	if total != 1 {
-		t.Errorf("Expected total 1, got %d", total)
-	}
-
-	if len(filteredTasks) != 1 {
-		t.Errorf("Expected 1 task, got %d", len(filteredTasks))
-	}
-
-	if filteredTasks[0].Status != models.TaskRunning {
-		t.Errorf("Expected status Running, got %s", filteredTasks[0].Status)
 	}
 }

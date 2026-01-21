@@ -32,6 +32,7 @@ type Task struct {
 	StartedAt     *time.Time                `json:"startedAt,omitempty"`
 	FinishedAt    *time.Time                `json:"finishedAt,omitempty"`
 	EstimatedEnd  *time.Time                `json:"estimatedCompletion,omitempty"`
+	ErrorMessage  string                    `json:"errorMessage,omitempty"`
 	NodeStatuses  map[string]map[string]int `json:"nodeStatuses,omitempty"` // nodeName -> imageName -> status (1:success, 0:fail)
 }
 

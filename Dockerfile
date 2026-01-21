@@ -1,6 +1,5 @@
-# 多阶段构建
 # 阶段1: 构建
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # 安装必要的构建工具
 RUN apk add --no-cache git make wget tar
@@ -23,8 +22,9 @@ RUN go mod download
 # 复制源代码
 COPY . .
 
-# 构建应用
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /build/bin/apiserver ./cmd/apiserver
+# 同步依赖并构建应用
+RUN go mod tidy && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o /build/bin/apiserver ./cmd/apiserver
 
 # 阶段2: 运行
 FROM alpine:latest

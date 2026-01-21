@@ -38,10 +38,10 @@ func (t *StatusTracker) TrackTask(ctx context.Context, taskID string) error {
 	t.logger.WithField("taskId", taskID).Info("Starting task tracking")
 
 	// 确保 NodeStatuses 已初始化
-	task, err := t.repo.Get(ctx, taskID)
+	task, err := t.repo.GetTask(ctx, taskID)
 	if err == nil && task.NodeStatuses == nil {
 		task.NodeStatuses = make(map[string]map[string]int)
-		t.repo.Update(ctx, task)
+		t.repo.UpdateTask(ctx, task)
 	}
 
 	// 尝试使用Watch机制
@@ -95,7 +95,7 @@ func (t *StatusTracker) trackTaskWithWatch(ctx context.Context, taskID string) e
 				}).Debug("Received Job event")
 
 				// 获取任务并更新状态
-				task, err := t.repo.Get(ctx, taskID)
+				task, err := t.repo.GetTask(ctx, taskID)
 				if err != nil {
 					t.logger.WithFields(logrus.Fields{
 						"taskId": taskID,
@@ -122,7 +122,7 @@ func (t *StatusTracker) trackTaskWithWatch(ctx context.Context, taskID string) e
 				}
 
 				// 再次检查是否完成
-				task, _ = t.repo.Get(ctx, taskID)
+				task, _ = t.repo.GetTask(ctx, taskID)
 				if task != nil && t.isTaskFinished(task) {
 					t.logger.WithFields(logrus.Fields{
 						"taskId": taskID,
@@ -134,7 +134,7 @@ func (t *StatusTracker) trackTaskWithWatch(ctx context.Context, taskID string) e
 
 		case <-updateTicker.C:
 			// 定期更新（即使没有事件）
-			task, err := t.repo.Get(ctx, taskID)
+			task, err := t.repo.GetTask(ctx, taskID)
 			if err != nil {
 				t.logger.WithFields(logrus.Fields{
 					"taskId": taskID,
@@ -178,7 +178,7 @@ func (t *StatusTracker) trackTaskWithPolling(ctx context.Context, taskID string)
 		select {
 		case <-ticker.C:
 			// 获取任务
-			task, err := t.repo.Get(ctx, taskID)
+			task, err := t.repo.GetTask(ctx, taskID)
 			if err != nil {
 				t.logger.WithFields(logrus.Fields{
 					"taskId": taskID,
@@ -306,7 +306,7 @@ func (t *StatusTracker) updateTaskStatus(ctx context.Context, task *models.Task)
 		task.StartedAt = &now
 	}
 
-	return t.repo.Update(ctx, task)
+	return t.repo.UpdateTask(ctx, task)
 }
 
 // handlePodDetailedResults 解析 Pod 的终止消息并上报指标

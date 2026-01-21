@@ -66,6 +66,13 @@ spec:
             capabilities:
               drop:
                 - ALL
+          volumeMounts:
+            - name: ips-data
+              mountPath: /data
+      volumes:
+        - name: ips-data
+          persistentVolumeClaim:
+            claimName: ips-data
       # 调度策略：留在管理节点（根据你之前的配置）
       affinity:
         nodeAffinity:

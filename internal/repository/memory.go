@@ -21,8 +21,8 @@ func NewMemoryRepository() *MemoryRepository {
 	}
 }
 
-// Create 创建任务
-func (r *MemoryRepository) Create(ctx context.Context, task *models.Task) error {
+// CreateTask 创建任务
+func (r *MemoryRepository) CreateTask(ctx context.Context, task *models.Task) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -34,8 +34,8 @@ func (r *MemoryRepository) Create(ctx context.Context, task *models.Task) error 
 	return nil
 }
 
-// Get 获取任务
-func (r *MemoryRepository) Get(ctx context.Context, id string) (*models.Task, error) {
+// GetTask 获取任务
+func (r *MemoryRepository) GetTask(ctx context.Context, id string) (*models.Task, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -47,48 +47,25 @@ func (r *MemoryRepository) Get(ctx context.Context, id string) (*models.Task, er
 	return task, nil
 }
 
-// List 列出任务
-func (r *MemoryRepository) List(ctx context.Context, filter models.TaskFilter) ([]*models.Task, int, error) {
+// ListTasks 列出任务
+func (r *MemoryRepository) ListTasks(ctx context.Context) ([]*models.Task, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	// 收集所有任务
 	var allTasks []*models.Task
 	for _, task := range r.tasks {
-		// 状态过滤
-		if filter.Status != nil && task.Status != *filter.Status {
-			continue
-		}
 		allTasks = append(allTasks, task)
 	}
 
-	// 按创建时间倒序排序（最新的在前面）
 	sort.Slice(allTasks, func(i, j int) bool {
 		return allTasks[i].CreatedAt.After(allTasks[j].CreatedAt)
 	})
 
-	total := len(allTasks)
-
-	// 应用分页
-	if filter.Limit > 0 {
-		start := filter.Offset
-		if start > total {
-			return []*models.Task{}, total, nil
-		}
-
-		end := start + filter.Limit
-		if end > total {
-			end = total
-		}
-
-		allTasks = allTasks[start:end]
-	}
-
-	return allTasks, total, nil
+	return allTasks, nil
 }
 
-// Update 更新任务
-func (r *MemoryRepository) Update(ctx context.Context, task *models.Task) error {
+// UpdateTask 更新任务
+func (r *MemoryRepository) UpdateTask(ctx context.Context, task *models.Task) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -100,8 +77,8 @@ func (r *MemoryRepository) Update(ctx context.Context, task *models.Task) error 
 	return nil
 }
 
-// Delete 删除任务
-func (r *MemoryRepository) Delete(ctx context.Context, id string) error {
+// DeleteTask 删除任务
+func (r *MemoryRepository) DeleteTask(ctx context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -112,3 +89,24 @@ func (r *MemoryRepository) Delete(ctx context.Context, id string) error {
 	delete(r.tasks, id)
 	return nil
 }
+
+// Dummy User methods to satisfy interface
+
+func (r *MemoryRepository) CreateUser(ctx context.Context, user *models.User) error { return nil }
+func (r *MemoryRepository) GetUser(ctx context.Context, id int64) (*models.User, error) {
+	return nil, nil
+}
+func (r *MemoryRepository) GetByUsername(ctx context.Context, username string) (*models.User, error) {
+	return nil, nil
+}
+func (r *MemoryRepository) ListUsers(ctx context.Context) ([]*models.User, error)         { return nil, nil }
+func (r *MemoryRepository) UpdateUser(ctx context.Context, user *models.User) error       { return nil }
+func (r *MemoryRepository) DeleteUser(ctx context.Context, id int64) error                { return nil }
+func (r *MemoryRepository) CreateToken(ctx context.Context, token *models.APIToken) error { return nil }
+func (r *MemoryRepository) GetToken(ctx context.Context, tokenStr string) (*models.APIToken, error) {
+	return nil, nil
+}
+func (r *MemoryRepository) ListTokens(ctx context.Context, userID int64) ([]*models.APIToken, error) {
+	return nil, nil
+}
+func (r *MemoryRepository) DeleteToken(ctx context.Context, id int64) error { return nil }

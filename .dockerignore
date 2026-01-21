@@ -10,7 +10,8 @@
 *~
 
 # Build artifacts
-bin/
+# bin/
+!bin/apiserver
 *.exe
 *.exe~
 *.dll

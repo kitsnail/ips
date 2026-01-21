@@ -23,3 +23,9 @@ data:
 
   # 日志级别
   LOG_LEVEL: "info"
+
+  # 数据库路径 (持久化存储)
+  SQLITE_DB_PATH: "/data/ips.db"
+
+  # JWT 密钥 (正式环境请通过 Secret 配置)
+  JWT_SECRET: "ips-default-secret-change-me"
