@@ -37,8 +37,15 @@ func NewStatusTracker(repo repository.TaskRepository, jobCreator *k8s.JobCreator
 func (t *StatusTracker) TrackTask(ctx context.Context, taskID string) error {
 	t.logger.WithField("taskId", taskID).Info("Starting task tracking")
 
+	// 确保 NodeStatuses 已初始化
+	task, err := t.repo.Get(ctx, taskID)
+	if err == nil && task.NodeStatuses == nil {
+		task.NodeStatuses = make(map[string]map[string]int)
+		t.repo.Update(ctx, task)
+	}
+
 	// 尝试使用Watch机制
-	err := t.trackTaskWithWatch(ctx, taskID)
+	err = t.trackTaskWithWatch(ctx, taskID)
 	if err != nil {
 		t.logger.WithFields(logrus.Fields{
 			"taskId": taskID,
@@ -221,91 +228,60 @@ func (t *StatusTracker) updateTaskStatus(ctx context.Context, task *models.Task)
 	}
 
 	if len(jobs) == 0 {
-		// 如果还没有Job，任务状态保持为pending或running
 		return nil
 	}
 
-	// 统计Job状态
+	// 初始化
+	if task.NodeStatuses == nil {
+		task.NodeStatuses = make(map[string]map[string]int)
+	}
+	if task.Progress == nil {
+		task.Progress = &models.Progress{}
+	}
+
 	var completed, failed, running int
 	var failedNodes []models.FailedNode
 
 	for _, job := range jobs {
 		nodeName := job.Labels["node"]
 
-		if job.Status.Succeeded > 0 {
+		// 检查 Job 状态
+		isSucceeded := job.Status.Succeeded > 0
+		isFailed := job.Status.Failed > 0
+
+		if isSucceeded {
 			completed++
-		} else if job.Status.Failed > 0 {
+			// 解析详细结果 (如果尚未解析)
+			if _, processed := task.NodeStatuses[nodeName]; !processed {
+				t.handlePodDetailedResults(ctx, nodeName, job.Name, task)
+			}
+		} else if isFailed {
 			failed++
-			// 记录失败详情
-			failedNode := models.FailedNode{
+			if _, processed := task.NodeStatuses[nodeName]; !processed {
+				task.NodeStatuses[nodeName] = make(map[string]int) // 标记为已处理但失败
+				metrics.NodesProcessed.WithLabelValues("failed").Inc()
+			}
+			failedNodes = append(failedNodes, models.FailedNode{
 				NodeName:  nodeName,
 				Reason:    "JobFailed",
 				Message:   getJobFailureMessage(&job),
 				Timestamp: time.Now(),
-			}
-			failedNodes = append(failedNodes, failedNode)
+			})
 		} else {
 			running++
 		}
 	}
 
-	// 更新任务进度
-	if task.Progress == nil {
-		task.Progress = &models.Progress{}
-	}
-
+	// 更新进度
 	task.Progress.CompletedNodes = completed
 	task.Progress.FailedNodes = failed
 	task.FailedNodes = failedNodes
-
-	// 初始化 NodeStatuses
-	if task.NodeStatuses == nil {
-		task.NodeStatuses = make(map[string]map[string]int)
-	}
-
-	// 获取 Pod 状态以解析详细信息
-	for _, job := range jobs {
-		nodeName := job.Labels["node"]
-		// 列出该 Job 关联的 Pod
-		podList, err := t.jobCreator.GetK8sClient().Clientset.CoreV1().Pods(t.jobCreator.GetK8sClient().Namespace).List(ctx, metav1.ListOptions{
-			LabelSelector: fmt.Sprintf("job-name=%s", job.Name),
-		})
-		if err != nil || len(podList.Items) == 0 {
-			continue
-		}
-
-		pod := podList.Items[0]
-		for _, cs := range pod.Status.ContainerStatuses {
-			if cs.Name == "puller" && cs.State.Terminated != nil && cs.State.Terminated.Message != "" {
-				// 解析 Termination Message
-				var results map[string]int
-				if err := json.Unmarshal([]byte(cs.State.Terminated.Message), &results); err == nil {
-					task.NodeStatuses[nodeName] = results
-
-					// 上报指标
-					for img, status := range results {
-						statusStr := "success"
-						if status == 0 {
-							statusStr = "failed"
-						}
-						metrics.ImagePrewarmStatus.WithLabelValues(nodeName, img, statusStr).Inc()
-					}
-				}
-			}
-		}
-	}
-
-	// 计算百分比
 	task.CalculateProgress()
 
-	// 判断任务最终状态
-	totalProcessed := completed + failed
-	if totalProcessed == task.Progress.TotalNodes {
-		// 所有节点都处理完毕
+	// 判断是否结束
+	if (completed+failed) >= task.Progress.TotalNodes && task.Progress.TotalNodes > 0 {
 		now := time.Now()
 		task.FinishedAt = &now
-
-		// 根据成功率判定最终状态
 		successRate := float64(completed) / float64(task.Progress.TotalNodes)
 		if successRate >= 0.9 {
 			task.Status = models.TaskCompleted
@@ -313,24 +289,59 @@ func (t *StatusTracker) updateTaskStatus(ctx context.Context, task *models.Task)
 			task.Status = models.TaskFailed
 		}
 
+		// 上报总指标
+		duration := time.Since(task.CreatedAt).Seconds()
+		metrics.TasksTotal.WithLabelValues(string(task.Status)).Inc()
+		metrics.TaskDuration.WithLabelValues(string(task.Status)).Observe(duration)
+		metrics.ActiveTasks.Dec()
+		metrics.ImagesPulled.Add(float64(len(task.Images) * completed))
+
 		t.logger.WithFields(logrus.Fields{
-			"taskId":      task.ID,
-			"status":      task.Status,
-			"completed":   completed,
-			"failed":      failed,
-			"successRate": successRate,
-		}).Info("Task finished")
-	} else if running > 0 {
-		// 还有Job在运行
-		if task.Status == models.TaskPending {
-			task.Status = models.TaskRunning
-			now := time.Now()
-			task.StartedAt = &now
-		}
+			"taskId": task.ID,
+			"status": task.Status,
+		}).Info("Task tracking finished")
+	} else if running > 0 && task.Status == models.TaskPending {
+		task.Status = models.TaskRunning
+		now := time.Now()
+		task.StartedAt = &now
 	}
 
-	// 保存任务状态
 	return t.repo.Update(ctx, task)
+}
+
+// handlePodDetailedResults 解析 Pod 的终止消息并上报指标
+func (t *StatusTracker) handlePodDetailedResults(ctx context.Context, nodeName, jobName string, task *models.Task) {
+	podList, err := t.jobCreator.GetK8sClient().Clientset.CoreV1().Pods(t.jobCreator.GetK8sClient().Namespace).List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("job-name=%s", jobName),
+	})
+	if err != nil || len(podList.Items) == 0 {
+		return
+	}
+
+	pod := podList.Items[0]
+	for _, cs := range pod.Status.ContainerStatuses {
+		if cs.Name == "puller" && cs.State.Terminated != nil && cs.State.Terminated.Message != "" {
+			var results map[string]int
+			if err := json.Unmarshal([]byte(cs.State.Terminated.Message), &results); err == nil {
+				task.NodeStatuses[nodeName] = results
+				// 标记节点成功指标
+				metrics.NodesProcessed.WithLabelValues("success").Inc()
+				// 标记详细镜像指标
+				for img, status := range results {
+					if status == 1 {
+						// 成功：success=1, failed=0
+						metrics.ImagePrewarmStatus.WithLabelValues(nodeName, img, "success").Set(1.0)
+						metrics.ImagePrewarmStatus.WithLabelValues(nodeName, img, "failed").Set(0.0)
+					} else {
+						// 失败：success=0, failed=1
+						metrics.ImagePrewarmStatus.WithLabelValues(nodeName, img, "success").Set(0.0)
+						metrics.ImagePrewarmStatus.WithLabelValues(nodeName, img, "failed").Set(1.0)
+					}
+				}
+			}
+			return
+		}
+	}
 }
 
 // getJobFailureMessage 获取Job失败原因

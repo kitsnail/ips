@@ -137,6 +137,7 @@ func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequ
 		}).Info("Task acquired execution slot")
 
 		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
 		m.taskContexts.Store(task.ID, cancel)
 		defer m.taskContexts.Delete(task.ID)
 
@@ -199,17 +200,7 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 	// 记录任务状态变更指标
 	metrics.TasksTotal.WithLabelValues(string(models.TaskRunning)).Inc()
 
-	// 3. 启动状态跟踪器
-	go func() {
-		if err := m.statusTracker.TrackTask(ctx, task.ID); err != nil {
-			m.logger.WithFields(logrus.Fields{
-				"taskId": task.ID,
-				"error":  err,
-			}).Error("Status tracking failed")
-		}
-	}()
-
-	// 4. 执行批次调度
+	// 3. 执行批次调度 (创建所有 Job)
 	err = m.batchScheduler.ExecuteBatches(
 		ctx,
 		task.ID,
@@ -217,34 +208,15 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 		task.Images,
 		task.BatchSize,
 		func(batchNum, succeeded, failed int) {
-			// 批次完成回调
 			m.logger.WithFields(logrus.Fields{
 				"taskId":    task.ID,
 				"batchNum":  batchNum,
 				"succeeded": succeeded,
 				"failed":    failed,
-			}).Info("Batch completed")
-
-			// 记录节点处理指标
-			metrics.NodesProcessed.WithLabelValues("success").Add(float64(succeeded))
-			metrics.NodesProcessed.WithLabelValues("failed").Add(float64(failed))
-
-			// 更新当前批次和进度
-			task, err := m.repo.Get(ctx, task.ID)
-			if err == nil && task.Progress != nil {
-				task.Progress.CurrentBatch = batchNum
-				task.Progress.CompletedNodes += succeeded
-				task.Progress.FailedNodes += failed
-				task.CalculateProgress()
-				m.repo.Update(ctx, task)
-
-				m.logger.WithFields(logrus.Fields{
-					"taskId":         task.ID,
-					"completedNodes": task.Progress.CompletedNodes,
-					"failedNodes":    task.Progress.FailedNodes,
-					"percentage":     task.Progress.Percentage,
-				}).Info("Progress updated")
-			}
+			}).Info("Batch submitted")
+			// 更新批次数进度
+			task.Progress.CurrentBatch = batchNum
+			m.repo.Update(ctx, task)
 		},
 	)
 
@@ -252,44 +224,13 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 		return m.markTaskFailed(ctx, task, fmt.Errorf("batch execution failed: %w", err), startTime)
 	}
 
-	// 标记任务完成
-	updatedTask, getErr := m.repo.Get(ctx, task.ID)
-	if getErr != nil {
-		m.logger.WithFields(logrus.Fields{
-			"taskId": task.ID,
-			"error":  getErr,
-		}).Error("Failed to get task for completion")
-		return getErr
+	// 4. 同步等待状态跟踪器完成 (它会观察 Job 状态并上报最终结果)
+	err = m.statusTracker.TrackTask(ctx, task.ID)
+	if err != nil {
+		return m.markTaskFailed(ctx, task, fmt.Errorf("status tracking failed: %w", err), startTime)
 	}
 
-	updatedTask.Status = models.TaskCompleted
-	completedAt := time.Now()
-	updatedTask.FinishedAt = &completedAt
-
-	if updateErr := m.repo.Update(ctx, updatedTask); updateErr != nil {
-		m.logger.WithFields(logrus.Fields{
-			"taskId": updatedTask.ID,
-			"error":  updateErr,
-		}).Error("Failed to update task status to completed")
-		return updateErr
-	}
-
-	// 记录任务完成指标
-	duration := time.Since(startTime).Seconds()
-	metrics.TasksTotal.WithLabelValues(string(models.TaskCompleted)).Inc()
-	metrics.TaskDuration.WithLabelValues(string(models.TaskCompleted)).Observe(duration)
-	metrics.ActiveTasks.Dec()
-	metrics.ImagesPulled.Add(float64(len(task.Images) * len(nodes)))
-
-	// 发送 Webhook 通知
-	if err := m.webhookNotifier.NotifyTaskCompleted(ctx, updatedTask); err != nil {
-		m.logger.WithFields(logrus.Fields{
-			"taskId": updatedTask.ID,
-			"error":  err,
-		}).Warn("Failed to send webhook notification for completed task")
-	}
-
-	m.logger.WithField("taskId", updatedTask.ID).Info("Task execution completed")
+	m.logger.WithField("taskId", task.ID).Info("Task execution context finished")
 	return nil
 }
 

@@ -88,10 +88,10 @@ var (
 	)
 
 	// ImagePrewarmStatus 每个镜像在每个节点上的预热状态
-	ImagePrewarmStatus = promauto.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "ips_image_prewarm_status_total",
-			Help: "Detailed status of each image prewarming on each node",
+	ImagePrewarmStatus = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "ips_image_prewarm_status",
+			Help: "Detailed status of each image prewarming on each node (1 for the current status)",
 		},
 		[]string{"node", "image", "status"}, // status: success, failed
 	)

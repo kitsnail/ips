@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,7 +14,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
-                         'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+                'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
             background: #f5f5f5;
             color: #333;
         }
@@ -22,7 +23,7 @@
             background: #1890ff;
             color: white;
             padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
         }
 
         .header h1 {
@@ -41,7 +42,7 @@
             padding: 20px;
             margin-bottom: 20px;
             border-radius: 4px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
             display: flex;
             gap: 10px;
             align-items: center;
@@ -77,7 +78,7 @@
         .task-list {
             background: white;
             border-radius: 4px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
 
@@ -115,11 +116,30 @@
             font-weight: 500;
         }
 
-        .status-pending { background: #ffd666; color: #ad6800; }
-        .status-running { background: #91d5ff; color: #0050b3; }
-        .status-completed { background: #95de64; color: #389e0d; }
-        .status-failed { background: #ffa39e; color: #cf1322; }
-        .status-cancelled { background: #d9d9d9; color: #595959; }
+        .status-pending {
+            background: #ffd666;
+            color: #ad6800;
+        }
+
+        .status-running {
+            background: #91d5ff;
+            color: #0050b3;
+        }
+
+        .status-completed {
+            background: #95de64;
+            color: #389e0d;
+        }
+
+        .status-failed {
+            background: #ffa39e;
+            color: #cf1322;
+        }
+
+        .status-cancelled {
+            background: #d9d9d9;
+            color: #595959;
+        }
 
         .task-info {
             font-size: 13px;
@@ -153,7 +173,7 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background: rgba(0,0,0,0.5);
+            background: rgba(0, 0, 0, 0.5);
             z-index: 1000;
             align-items: center;
             justify-content: center;
@@ -262,18 +282,51 @@
             padding-bottom: 0;
         }
 
-        .filter-bar {
-            display: flex;
-            gap: 10px;
-            align-items: center;
+        .node-status-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 13px;
         }
 
-        select.form-input {
-            width: auto;
-            min-width: 150px;
+        .node-status-table th,
+        .node-status-table td {
+            border: 1px solid #f0f0f0;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .node-status-table th {
+            background: #fafafa;
+            font-weight: 500;
+        }
+
+        .image-tag-success {
+            color: #52c41a;
+            background: #f6ffed;
+            border: 1px solid #b7eb8f;
+            padding: 1px 4px;
+            border-radius: 2px;
+            margin-right: 4px;
+        }
+
+        .image-tag-failed {
+            color: #ff4d4f;
+            background: #fff1f0;
+            border: 1px solid #ffa39e;
+            padding: 1px 4px;
+            border-radius: 2px;
+            margin-right: 4px;
+        }
+
+        .node-name-cell {
+            font-weight: 500;
+            color: #1890ff;
+            width: 30%;
         }
     </style>
 </head>
+
 <body>
     <div class="header">
         <div class="container">
@@ -310,7 +363,8 @@
             <form id="createTaskForm" onsubmit="createTask(event)">
                 <div class="form-group">
                     <label class="form-label">镜像列表 *</label>
-                    <textarea class="form-input" id="images" placeholder="每行一个镜像，例如：&#10;nginx:latest&#10;redis:7&#10;mysql:8" required></textarea>
+                    <textarea class="form-input" id="images"
+                        placeholder="每行一个镜像，例如：&#10;nginx:latest&#10;redis:7&#10;mysql:8" required></textarea>
                 </div>
                 <div class="form-group">
                     <label class="form-label">批次大小 *</label>
@@ -358,11 +412,13 @@
             <div id="taskDetail"></div>
             <div class="form-actions">
                 <button type="button" class="btn btn-secondary" onclick="hideDetailModal()">关闭</button>
-                <button type="button" class="btn btn-primary" id="cancelTaskBtn" onclick="cancelCurrentTask()" style="display:none;">取消任务</button>
+                <button type="button" class="btn btn-primary" id="cancelTaskBtn" onclick="cancelCurrentTask()"
+                    style="display:none;">取消任务</button>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=1.0.1"></script>
 </body>
+
 </html>

@@ -7,7 +7,7 @@ let currentTaskId = null;
 let autoRefreshInterval = null;
 
 // 初始化
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     refreshTasks();
     // 每5秒自动刷新
     autoRefreshInterval = setInterval(refreshTasks, 5000);
@@ -157,6 +157,7 @@ async function showTaskDetail(taskId) {
                 <span class="detail-value">${task.progress.currentBatch}/${task.progress.totalBatches}</span>
             </div>
             ` : ''}
+            ${renderNodeStatuses(task.nodeStatuses)}
             ${task.failedNodeDetails && task.failedNodeDetails.length > 0 ? renderFailedNodes(task.failedNodeDetails) : ''}
         `;
 
@@ -164,17 +165,83 @@ async function showTaskDetail(taskId) {
 
         // 显示/隐藏取消按钮
         const cancelBtn = document.getElementById('cancelTaskBtn');
+        const refreshDetailBtn = document.getElementById('refreshDetailBtn') || createRefreshDetailBtn();
+
         if (task.status === 'pending' || task.status === 'running') {
             cancelBtn.style.display = 'inline-block';
         } else {
             cancelBtn.style.display = 'none';
         }
 
+        if (refreshDetailBtn) {
+            refreshDetailBtn.onclick = () => showTaskDetail(taskId);
+        }
+
         document.getElementById('detailModal').classList.add('show');
     } catch (error) {
         console.error('Failed to fetch task detail:', error);
-        alert('获取任务详情失败');
+        // 不弹窗，静默失败或在详情区显示错误
     }
+}
+
+// 创建详情刷新按钮（如果不存在）
+function createRefreshDetailBtn() {
+    // index.html 中使用的是 .form-actions 而不是 .modal-footer
+    const footer = document.querySelector('#detailModal .form-actions');
+    if (!footer) return null;
+
+    // 检查是否已经有这个按钮
+    let btn = document.getElementById('refreshDetailBtn');
+    if (btn) return btn;
+
+    btn = document.createElement('button');
+    btn.id = 'refreshDetailBtn';
+    btn.className = 'btn btn-secondary';
+    btn.innerText = '刷新详情';
+    btn.style.marginRight = '8px';
+    footer.insertBefore(btn, footer.firstChild);
+    return btn;
+}
+
+// 渲染节点镜像状态
+function renderNodeStatuses(nodeStatuses) {
+    if (!nodeStatuses || Object.keys(nodeStatuses).length === 0) {
+        return `
+            <div class="empty-state" style="margin-top: 16px; padding: 10px; border: 1px dashed #d9d9d9;">
+                暂无节点详细镜像状态（可能正在收集或 Pod 已过期）
+            </div>
+        `;
+    }
+
+    const rows = Object.entries(nodeStatuses).map(([nodeName, images]) => {
+        const imageTags = Object.entries(images).map(([image, status]) => {
+            const className = status === 1 ? 'image-tag-success' : 'image-tag-failed';
+            const label = status === 1 ? '成功' : '失败';
+            return `<span class="${className}">${image} (${label})</span>`;
+        }).join(' ');
+
+        return `
+            <tr>
+                <td class="node-name-cell">${nodeName}</td>
+                <td>${imageTags}</td>
+            </tr>
+        `;
+    }).join('');
+
+    return `
+        <div style="margin-top: 16px; font-weight: 500;">节点镜像拉取详情:</div>
+        <table class="node-status-table">
+            <thead>
+                <tr>
+                    <th>节点名称</th>
+                    <th>镜像详情</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rows}
+            </tbody>
+        </table>
+    `;
 }
 
 // 渲染失败节点
@@ -249,7 +316,8 @@ async function createTask(event) {
         }
 
         const task = await response.json();
-        alert(`任务创建成功！任务ID: ${task.taskId}`);
+        // 移除弹窗，直接刷新列表并隐藏模态框
+        console.log(`任务创建成功！任务ID: ${task.taskId}`);
         hideCreateTaskModal();
         document.getElementById('createTaskForm').reset();
         refreshTasks();
@@ -277,7 +345,7 @@ async function cancelCurrentTask() {
             throw new Error(error.error || '取消失败');
         }
 
-        alert('任务已取消');
+        console.log('任务已取消');
         hideDetailModal();
         refreshTasks();
     } catch (error) {
@@ -334,7 +402,7 @@ function formatTime(timeStr) {
 }
 
 // 点击模态框外部关闭
-document.addEventListener('click', function(e) {
+document.addEventListener('click', function (e) {
     if (e.target.classList.contains('modal')) {
         e.target.classList.remove('show');
     }
