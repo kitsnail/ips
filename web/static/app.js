@@ -90,73 +90,62 @@ async function showTaskDetail(taskId) {
         currentTaskId = taskId;
 
         const detailHtml = `
-            <div class="detail-row">
-                <span class="detail-label">任务ID:</span>
-                <span class="detail-value">${task.taskId}</span>
+            <!-- 状态统计板 -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-label">任务状态</div>
+                    <div class="stat-value info" style="font-size: 18px;">
+                        <span class="task-status status-${task.status}">${getStatusText(task.status)}</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">总体进度</div>
+                    <div class="stat-value info">${task.progress ? task.progress.percentage.toFixed(1) : 0}%</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">节点 (完成/总数)</div>
+                    <div class="stat-value success">${task.progress ? task.progress.completedNodes : 0} / ${task.progress ? task.progress.totalNodes : 0}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">异常节点</div>
+                    <div class="stat-value failed">${task.progress ? task.progress.failedNodes : 0}</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">当前批次</div>
+                    <div class="stat-value">${task.progress ? task.progress.currentBatch : 0} / ${task.progress ? task.progress.totalBatches : 0}</div>
+                </div>
             </div>
-            <div class="detail-row">
-                <span class="detail-label">状态:</span>
-                <span class="task-status status-${task.status}">${getStatusText(task.status)}</span>
+
+            <!-- 元数据详情 -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px;">
+                <div class="config-pane" style="border: none; padding: 0;">
+                    <div class="detail-row">
+                        <span class="detail-label">任务ID:</span>
+                        <span class="detail-value">${task.taskId}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">创建时间:</span>
+                        <span class="detail-value">${formatTime(task.createdAt)}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">重试情况:</span>
+                        <span class="detail-value">${task.retryCount} / ${task.maxRetries} (策略: ${task.retryStrategy === 'exponential' ? '指数' : '线性'})</span>
+                    </div>
+                </div>
+                <div class="config-pane" style="border: none; padding: 0;">
+                    <div class="detail-row">
+                        <span class="detail-label">镜像列表:</span>
+                        <div class="detail-value" style="word-break: break-all; font-size: 12px; max-height: 60px; overflow-y: auto; background: #fafafa; padding: 8px; border-radius: 4px;">
+                            ${task.images.join('<br>')}
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="detail-row">
-                <span class="detail-label">优先级:</span>
-                <span class="detail-value">${task.priority}</span>
+
+            <div class="progress-bar" style="height: 10px; margin-bottom: 24px;">
+                <div class="progress-fill" style="width: ${task.progress ? task.progress.percentage : 0}%"></div>
             </div>
-            <div class="detail-row">
-                <span class="detail-label">镜像列表:</span>
-                <span class="detail-value">${task.images.join(', ')}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">批次大小:</span>
-                <span class="detail-value">${task.batchSize}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">最大重试次数:</span>
-                <span class="detail-value">${task.maxRetries}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">当前重试次数:</span>
-                <span class="detail-value">${task.retryCount}</span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">重试策略:</span>
-                <span class="detail-value">${task.retryStrategy === 'exponential' ? '指数退避' : '线性'}</span>
-            </div>
-            ${task.webhookUrl ? `
-            <div class="detail-row">
-                <span class="detail-label">Webhook URL:</span>
-                <span class="detail-value">${task.webhookUrl}</span>
-            </div>
-            ` : ''}
-            <div class="detail-row">
-                <span class="detail-label">创建时间:</span>
-                <span class="detail-value">${formatTime(task.createdAt)}</span>
-            </div>
-            ${task.startedAt ? `
-            <div class="detail-row">
-                <span class="detail-label">开始时间:</span>
-                <span class="detail-value">${formatTime(task.startedAt)}</span>
-            </div>
-            ` : ''}
-            ${task.finishedAt ? `
-            <div class="detail-row">
-                <span class="detail-label">完成时间:</span>
-                <span class="detail-value">${formatTime(task.finishedAt)}</span>
-            </div>
-            ` : ''}
-            ${task.progress ? `
-            <div class="detail-row">
-                <span class="detail-label">进度:</span>
-                <span class="detail-value">
-                    ${task.progress.percentage.toFixed(1)}%
-                    (${task.progress.completedNodes}/${task.progress.totalNodes} 节点)
-                </span>
-            </div>
-            <div class="detail-row">
-                <span class="detail-label">批次进度:</span>
-                <span class="detail-value">${task.progress.currentBatch}/${task.progress.totalBatches}</span>
-            </div>
-            ` : ''}
+
             ${renderNodeStatuses(task.nodeStatuses)}
             ${task.failedNodeDetails && task.failedNodeDetails.length > 0 ? renderFailedNodes(task.failedNodeDetails) : ''}
         `;
@@ -196,8 +185,8 @@ function createRefreshDetailBtn() {
 
     btn = document.createElement('button');
     btn.id = 'refreshDetailBtn';
-    btn.className = 'btn btn-secondary';
-    btn.innerText = '刷新详情';
+    btn.className = 'btn btn-primary';
+    btn.innerText = '刷新仪表盘';
     btn.style.marginRight = '8px';
     footer.insertBefore(btn, footer.firstChild);
     return btn;
@@ -207,7 +196,8 @@ function createRefreshDetailBtn() {
 function renderNodeStatuses(nodeStatuses) {
     if (!nodeStatuses || Object.keys(nodeStatuses).length === 0) {
         return `
-            <div class="empty-state" style="margin-top: 16px; padding: 10px; border: 1px dashed #d9d9d9;">
+            <div class="empty-state" style="margin-top: 16px; padding: 30px; border: 1px dashed #d9d9d9; background: #fafafa;">
+                <div style="font-size: 24px; margin-bottom: 8px;">🕒</div>
                 暂无节点详细镜像状态（可能正在收集或 Pod 已过期）
             </div>
         `;
@@ -217,30 +207,38 @@ function renderNodeStatuses(nodeStatuses) {
         const imageTags = Object.entries(images).map(([image, status]) => {
             const className = status === 1 ? 'image-tag-success' : 'image-tag-failed';
             const label = status === 1 ? '成功' : '失败';
-            return `<span class="${className}">${image} (${label})</span>`;
+            return `<span class="${className}" style="display: inline-block; margin-bottom: 4px;">${image} (${label})</span>`;
         }).join(' ');
 
         return `
             <tr>
-                <td class="node-name-cell">${nodeName}</td>
+                <td class="node-name-cell" style="vertical-align: top;">
+                    <div style="font-weight: 600;">${nodeName}</div>
+                    <div style="font-size: 11px; color: #999;">Node Status</div>
+                </td>
                 <td>${imageTags}</td>
             </tr>
         `;
     }).join('');
 
     return `
-        <div style="margin-top: 16px; font-weight: 500;">节点镜像拉取详情:</div>
-        <table class="node-status-table">
-            <thead>
-                <tr>
-                    <th>节点名称</th>
-                    <th>镜像详情</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${rows}
-            </tbody>
-        </table>
+        <div style="margin-top: 24px;">
+            <div style="font-size: 16px; font-weight: 600; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                <span style="width: 4px; height: 16px; background: #1890ff; border-radius: 2px;"></span>
+                节点镜像拉取详情
+            </div>
+            <table class="node-status-table">
+                <thead>
+                    <tr>
+                        <th style="width: 250px;">节点名称</th>
+                        <th>镜像执行结果 (每个镜像的拉取结果)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows}
+                </tbody>
+            </table>
+        </div>
     `;
 }
 

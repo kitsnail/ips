@@ -184,19 +184,106 @@
         }
 
         .modal-content {
-            background: white;
-            padding: 24px;
-            border-radius: 8px;
-            max-width: 600px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 0;
+            border-radius: 12px;
+            max-width: 95vw;
+            width: 95vw;
+            height: 95vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            overflow: hidden;
         }
 
         .modal-header {
-            font-size: 18px;
-            font-weight: 500;
-            margin-bottom: 20px;
+            font-size: 20px;
+            font-weight: 600;
+            padding: 20px 24px;
+            border-bottom: 1px solid #f0f0f0;
+            margin-bottom: 0;
+            background: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-body {
+            flex: 1;
+            padding: 24px;
+            overflow-y: auto;
+        }
+
+        /* 创建任务分栏逻辑 */
+        .create-grid {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 24px;
+            height: 100%;
+        }
+
+        .config-pane {
+            border-right: 1px solid #f0f0f0;
+            padding-right: 24px;
+        }
+
+        .editor-pane {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        textarea.editor-input {
+            flex: 1;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            line-height: 1.6;
+            background: #fafafa;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            padding: 12px;
+            font-size: 13px;
+        }
+
+        /* 详情看板显示逻辑 */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid #f0f0f0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #8c8c8c;
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 24px;
+            font-weight: 600;
+            color: #262626;
+        }
+
+        .stat-value.success {
+            color: #52c41a;
+        }
+
+        .stat-value.failed {
+            color: #ff4d4f;
+        }
+
+        .stat-value.info {
+            color: #1890ff;
         }
 
         .form-group {
@@ -230,9 +317,11 @@
 
         .form-actions {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             justify-content: flex-end;
-            margin-top: 24px;
+            padding: 16px 24px;
+            background: #fff;
+            border-top: 1px solid #f0f0f0;
         }
 
         .empty-state {
@@ -360,56 +449,71 @@
     <div id="createModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">创建镜像预热任务</div>
-            <form id="createTaskForm" onsubmit="createTask(event)">
-                <div class="form-group">
-                    <label class="form-label">镜像列表 *</label>
-                    <textarea class="form-input" id="images"
-                        placeholder="每行一个镜像，例如：&#10;nginx:latest&#10;redis:7&#10;mysql:8" required></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">批次大小 *</label>
-                    <input type="number" class="form-input" id="batchSize" value="10" min="1" max="100" required>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">优先级 (1-10，默认5)</label>
-                    <input type="number" class="form-input" id="priority" value="5" min="1" max="10">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">最大重试次数 (0-5，默认0)</label>
-                    <input type="number" class="form-input" id="maxRetries" value="0" min="0" max="5">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">重试策略</label>
-                    <select class="form-input" id="retryStrategy">
-                        <option value="linear">线性</option>
-                        <option value="exponential">指数退避</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">重试延迟(秒，默认30)</label>
-                    <input type="number" class="form-input" id="retryDelay" value="30" min="1" max="300">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Webhook URL (可选)</label>
-                    <input type="url" class="form-input" id="webhookUrl" placeholder="https://example.com/webhook">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">节点选择器 (可选，JSON格式)</label>
-                    <input type="text" class="form-input" id="nodeSelector" placeholder='{"workload":"compute"}'>
-                </div>
-                <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="hideCreateTaskModal()">取消</button>
-                    <button type="submit" class="btn btn-primary">创建任务</button>
-                </div>
-            </form>
+            <div class="modal-body">
+                <form id="createTaskForm" onsubmit="createTask(event)" style="height: 100%;">
+                    <div class="create-grid">
+                        <div class="config-pane">
+                            <div class="form-group">
+                                <label class="form-label">批次大小 *</label>
+                                <input type="number" class="form-input" id="batchSize" value="10" min="1" max="100"
+                                    required>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">优先级 (1-10，默认5)</label>
+                                <input type="number" class="form-input" id="priority" value="5" min="1" max="10">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">最大重试次数 (0-5，默认0)</label>
+                                <input type="number" class="form-input" id="maxRetries" value="0" min="0" max="5">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">重试策略</label>
+                                <select class="form-input" id="retryStrategy">
+                                    <option value="linear">线性</option>
+                                    <option value="exponential">指数退避</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">重试延迟(秒，默认30)</label>
+                                <input type="number" class="form-input" id="retryDelay" value="30" min="1" max="300">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Webhook URL (可选)</label>
+                                <input type="url" class="form-input" id="webhookUrl"
+                                    placeholder="https://example.com/webhook">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">节点选择器 (可选，JSON格式)</label>
+                                <input type="text" class="form-input" id="nodeSelector"
+                                    placeholder='{"workload":"compute"}'>
+                            </div>
+                        </div>
+                        <div class="editor-pane">
+                            <label class="form-label">镜像列表 * (每行一个镜像)</label>
+                            <textarea class="form-input editor-input" id="images"
+                                placeholder="docker.io/library/nginx:latest&#10;registry.hub.docker.com/library/redis:7"
+                                required></textarea>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="hideCreateTaskModal()">取消</button>
+                <button type="button" class="btn btn-primary"
+                    onclick="document.getElementById('createTaskForm').requestSubmit()">创建任务并开始</button>
+            </div>
         </div>
     </div>
 
     <!-- 任务详情模态框 -->
     <div id="detailModal" class="modal">
         <div class="modal-content">
-            <div class="modal-header">任务详情</div>
-            <div id="taskDetail"></div>
+            <div class="modal-header">
+                <span>任务详情仪表盘</span>
+            </div>
+            <div class="modal-body" id="taskDetail">
+                <div class="loading">加载详情中...</div>
+            </div>
             <div class="form-actions">
                 <button type="button" class="btn btn-secondary" onclick="hideDetailModal()">关闭</button>
                 <button type="button" class="btn btn-primary" id="cancelTaskBtn" onclick="cancelCurrentTask()"
