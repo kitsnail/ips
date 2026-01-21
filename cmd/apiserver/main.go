@@ -6,17 +6,32 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
 	"github.com/kitsnail/ips/internal/api"
 	"github.com/kitsnail/ips/internal/k8s"
+	"github.com/kitsnail/ips/internal/puller"
 	"github.com/kitsnail/ips/internal/repository"
 	"github.com/kitsnail/ips/internal/service"
 	"github.com/sirupsen/logrus"
 )
 
 func main() {
+	// 检查是否是辅助拉取命令
+	if len(os.Args) > 1 && os.Args[1] == "pull" {
+		imagesStr := os.Getenv("IMAGES")
+		socketPath := os.Getenv("CRI_SOCKET_PATH")
+		if imagesStr == "" || socketPath == "" {
+			fmt.Println("Missing IMAGES or CRI_SOCKET_PATH environment variables")
+			os.Exit(1)
+		}
+		images := strings.Split(imagesStr, ",")
+		puller.Run(images, socketPath)
+		return
+	}
+
 	// 初始化日志
 	logger := logrus.New()
 	logger.SetFormatter(&logrus.JSONFormatter{
@@ -48,7 +63,17 @@ func main() {
 		workerImage = "registry.k8s.io/pause:3.10"
 	}
 
-	jobCreator := k8s.NewJobCreator(k8sClient, workerImage)
+	pullerImage := os.Getenv("PULLER_IMAGE")
+	if pullerImage == "" {
+		pullerImage = "registry.k8s.io/build-containers/crictl:v1.31.0"
+	}
+
+	criSocketPath := os.Getenv("CRI_SOCKET_PATH")
+	if criSocketPath == "" {
+		criSocketPath = "/run/containerd/containerd.sock"
+	}
+
+	jobCreator := k8s.NewJobCreator(k8sClient, workerImage, pullerImage, criSocketPath)
 	nodeFilter := service.NewNodeFilter(k8sClient)
 	batchScheduler := service.NewBatchScheduler(jobCreator, logger)
 	statusTracker := service.NewStatusTracker(repo, jobCreator, logger)

@@ -44,7 +44,7 @@ func setupTestHandler() (*TaskHandler, *gin.Engine) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.ErrorLevel) // 测试时减少日志输出
 
-	jobCreator := k8s.NewJobCreator(k8sClient, "busybox:latest")
+	jobCreator := k8s.NewJobCreator(k8sClient, "busybox:latest", "registry.k8s.io/build-containers/crictl:v1.31.0", "/run/containerd/containerd.sock")
 	nodeFilter := service.NewNodeFilter(k8sClient)
 	batchScheduler := service.NewBatchScheduler(jobCreator, logger)
 	statusTracker := service.NewStatusTracker(repo, jobCreator, logger)

@@ -3,7 +3,13 @@
 FROM golang:1.23-alpine AS builder
 
 # 安装必要的构建工具
-RUN apk add --no-cache git make
+RUN apk add --no-cache git make wget tar
+
+# 下载 crictl
+ENV CRICTL_VERSION=v1.31.0
+RUN wget https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-amd64.tar.gz && \
+    tar -zxvf crictl-${CRICTL_VERSION}-linux-amd64.tar.gz -C /usr/local/bin && \
+    rm crictl-${CRICTL_VERSION}-linux-amd64.tar.gz
 
 # 设置工作目录
 WORKDIR /build
@@ -37,6 +43,7 @@ WORKDIR /app
 
 # 从构建阶段复制二进制文件
 COPY --from=builder /build/bin/apiserver /app/apiserver
+COPY --from=builder /usr/local/bin/crictl /usr/local/bin/crictl
 
 # 复制 Web UI 静态文件
 COPY --from=builder /build/web /app/web

@@ -98,6 +98,15 @@ docker build -t your-registry/ips-apiserver:v1.0.0 .
 # 2. 推送到镜像仓库
 docker push your-registry/ips-apiserver:v1.0.0
 
+```bash
+skopeo copy \
+  --override-os linux \
+  --override-arch arm64 \
+  --dest-tls-verify=false \
+  --dest-creds admin:Harbor12345 \
+  docker-daemon:ips-apiserver:latest \
+  docker://cr01.home.lan/library/ips-apiserver:latest
+```
 # 3. 更新 Deployment 配置
 # 编辑 deploy/deployment.yaml，修改镜像地址
 image: your-registry/ips-apiserver:v1.0.0

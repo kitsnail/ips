@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/kitsnail/ips/internal/k8s"
 	"github.com/kitsnail/ips/internal/repository"
+	"github.com/kitsnail/ips/pkg/metrics"
 	"github.com/kitsnail/ips/pkg/models"
 	"github.com/sirupsen/logrus"
 	batchv1 "k8s.io/api/batch/v1"
@@ -255,6 +257,43 @@ func (t *StatusTracker) updateTaskStatus(ctx context.Context, task *models.Task)
 	task.Progress.CompletedNodes = completed
 	task.Progress.FailedNodes = failed
 	task.FailedNodes = failedNodes
+
+	// 初始化 NodeStatuses
+	if task.NodeStatuses == nil {
+		task.NodeStatuses = make(map[string]map[string]int)
+	}
+
+	// 获取 Pod 状态以解析详细信息
+	for _, job := range jobs {
+		nodeName := job.Labels["node"]
+		// 列出该 Job 关联的 Pod
+		podList, err := t.jobCreator.GetK8sClient().Clientset.CoreV1().Pods(t.jobCreator.GetK8sClient().Namespace).List(ctx, metav1.ListOptions{
+			LabelSelector: fmt.Sprintf("job-name=%s", job.Name),
+		})
+		if err != nil || len(podList.Items) == 0 {
+			continue
+		}
+
+		pod := podList.Items[0]
+		for _, cs := range pod.Status.ContainerStatuses {
+			if cs.Name == "puller" && cs.State.Terminated != nil && cs.State.Terminated.Message != "" {
+				// 解析 Termination Message
+				var results map[string]int
+				if err := json.Unmarshal([]byte(cs.State.Terminated.Message), &results); err == nil {
+					task.NodeStatuses[nodeName] = results
+
+					// 上报指标
+					for img, status := range results {
+						statusStr := "success"
+						if status == 0 {
+							statusStr = "failed"
+						}
+						metrics.ImagePrewarmStatus.WithLabelValues(nodeName, img, statusStr).Inc()
+					}
+				}
+			}
+		}
+	}
 
 	// 计算百分比
 	task.CalculateProgress()

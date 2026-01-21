@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -11,19 +12,29 @@ import (
 
 // JobCreator Job创建器
 type JobCreator struct {
-	client      *Client
-	workerImage string
+	client        *Client
+	workerImage   string
+	pullerImage   string
+	criSocketPath string
 }
 
 // NewJobCreator 创建Job创建器
-func NewJobCreator(client *Client, workerImage string) *JobCreator {
+func NewJobCreator(client *Client, workerImage, pullerImage, criSocketPath string) *JobCreator {
 	if workerImage == "" {
-		workerImage = "registry.k8s.io/pause"
+		workerImage = "registry.k8s.io/pause:3.10"
+	}
+	if pullerImage == "" {
+		pullerImage = "registry.k8s.io/build-containers/crictl:v1.31.0"
+	}
+	if criSocketPath == "" {
+		criSocketPath = "/run/containerd/containerd.sock"
 	}
 
 	return &JobCreator{
-		client:      client,
-		workerImage: workerImage,
+		client:        client,
+		workerImage:   workerImage,
+		pullerImage:   pullerImage,
+		criSocketPath: criSocketPath,
 	}
 }
 
@@ -34,22 +45,9 @@ func NewJobCreator(client *Client, workerImage string) *JobCreator {
 func (j *JobCreator) CreateJob(ctx context.Context, taskID, nodeName string, images []string) error {
 	jobName := fmt.Sprintf("prewarm-%s-%s", taskID, nodeName)
 
-	// 构建拉取镜像的命令
-	// 使用 initContainers 来拉取目标镜像
-	initContainers := make([]corev1.Container, 0, len(images))
-	for i, image := range images {
-		initContainers = append(initContainers, corev1.Container{
-			Name:            fmt.Sprintf("pull-image-%d", i),
-			Image:           image,
-			Command:         []string{"sh", "-c"},
-			Args:            []string{"echo 'Image pulled successfully'"},
-			ImagePullPolicy: corev1.PullAlways, // 强制拉取
-		})
-	}
-
 	// TTL设置：Job完成后15分钟自动清理
 	ttl := int32(900)
-	backoffLimit := int32(3) // 失败重试3次
+	backoffLimit := int32(0) // 镜像预热不需要多次重试，失败就记录
 
 	job := &batchv1.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -72,14 +70,44 @@ func (j *JobCreator) CreateJob(ctx context.Context, taskID, nodeName string, ima
 					},
 				},
 				Spec: corev1.PodSpec{
-					RestartPolicy:  corev1.RestartPolicyNever,
-					InitContainers: initContainers, // initContainers拉取目标镜像
+					RestartPolicy: corev1.RestartPolicyNever,
 					Containers: []corev1.Container{
 						{
-							Name:    "reporter",
-							Image:   j.workerImage,
-							Command: []string{"sh", "-c"},
-							Args:    []string{"echo 'All images prewarmed successfully on node " + nodeName + "'"},
+							Name:    "puller",
+							Image:   j.pullerImage,
+							Command: []string{"/app/apiserver"},
+							Args:    []string{"pull"},
+							Env: []corev1.EnvVar{
+								{
+									Name:  "IMAGES",
+									Value: strings.Join(images, ","),
+								},
+								{
+									Name:  "CRI_SOCKET_PATH",
+									Value: j.criSocketPath,
+								},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{
+									Name:      "cri-socket",
+									MountPath: j.criSocketPath,
+								},
+							},
+							SecurityContext: &corev1.SecurityContext{
+								Privileged: func(b bool) *bool { return &b }(true),
+								RunAsUser:  func(i int64) *int64 { return &i }(0),
+								RunAsGroup: func(i int64) *int64 { return &i }(0),
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "cri-socket",
+							VolumeSource: corev1.VolumeSource{
+								HostPath: &corev1.HostPathVolumeSource{
+									Path: j.criSocketPath,
+								},
+							},
 						},
 					},
 					NodeSelector: map[string]string{

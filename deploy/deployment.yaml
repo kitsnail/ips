@@ -37,11 +37,11 @@ spec:
                 name: ips-config
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
               cpu: 500m
               memory: 512Mi
+            limits:
+              cpu: 1000m
+              memory: 2Gi
           livenessProbe:
             httpGet:
               path: /health
@@ -66,19 +66,15 @@ spec:
             capabilities:
               drop:
                 - ALL
+      # 调度策略：留在管理节点（根据你之前的配置）
       affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchExpressions:
-                    - key: app
-                      operator: In
-                      values:
-                        - ips
-                    - key: component
-                      operator: In
-                      values:
-                        - apiserver
-                topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: Exists
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule

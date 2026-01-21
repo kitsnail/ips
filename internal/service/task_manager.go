@@ -59,6 +59,11 @@ func NewTaskManager(
 
 // CreateTask 创建任务
 func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequest) (*models.Task, error) {
+	// 校验镜像数量
+	if len(req.Images) > 50 {
+		return nil, fmt.Errorf("too many images: max 50 images allowed per task")
+	}
+
 	// 生成任务ID
 	taskID := models.GenerateTaskID()
 

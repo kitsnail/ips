@@ -86,4 +86,13 @@ var (
 			Help: "Total number of images pulled across all nodes",
 		},
 	)
+
+	// ImagePrewarmStatus 每个镜像在每个节点上的预热状态
+	ImagePrewarmStatus = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ips_image_prewarm_status_total",
+			Help: "Detailed status of each image prewarming on each node",
+		},
+		[]string{"node", "image", "status"}, // status: success, failed
+	)
 )
