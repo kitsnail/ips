@@ -74,7 +74,16 @@ func (r *SQLiteRepository) initSchema() error {
 		FOREIGN KEY(user_id) REFERENCES users(id)
 	);`
 
-	for _, schema := range []string{taskSchema, userSchema, tokenSchema} {
+	// 镜像库表
+	librarySchema := `
+	CREATE TABLE IF NOT EXISTS image_library (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT,
+		image TEXT UNIQUE,
+		created_at DATETIME
+	);`
+
+	for _, schema := range []string{taskSchema, userSchema, tokenSchema, librarySchema} {
 		if _, err := r.db.Exec(schema); err != nil {
 			return err
 		}
@@ -297,5 +306,52 @@ func (r *SQLiteRepository) ListTokens(ctx context.Context, userID int64) ([]*mod
 
 func (r *SQLiteRepository) DeleteToken(ctx context.Context, id int64) error {
 	_, err := r.db.ExecContext(ctx, "DELETE FROM api_tokens WHERE id = ?", id)
+	return err
+}
+
+// LibraryRepository Implementation
+
+func (r *SQLiteRepository) SaveImage(ctx context.Context, img *models.LibraryImage) error {
+	if img.CreatedAt.IsZero() {
+		img.CreatedAt = time.Now()
+	}
+	query := `INSERT INTO image_library (name, image, created_at) VALUES (?, ?, ?)`
+	res, err := r.db.ExecContext(ctx, query, img.Name, img.Image, img.CreatedAt)
+	if err != nil {
+		return err
+	}
+	id, _ := res.LastInsertId()
+	img.ID = id
+	return nil
+}
+
+func (r *SQLiteRepository) ListImages(ctx context.Context, offset, limit int) ([]*models.LibraryImage, int, error) {
+	// Get total count
+	var total int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM image_library").Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	query := "SELECT id, name, image, created_at FROM image_library ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var images []*models.LibraryImage
+	for rows.Next() {
+		var img models.LibraryImage
+		if err := rows.Scan(&img.ID, &img.Name, &img.Image, &img.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		images = append(images, &img)
+	}
+	return images, total, nil
+}
+
+func (r *SQLiteRepository) DeleteImage(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM image_library WHERE id = ?", id)
 	return err
 }

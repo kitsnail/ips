@@ -18,7 +18,10 @@ let state = {
     currentTaskId: null,
     refreshInterval: null,
     debounceTimer: null,
-    confirmCallback: null // Store partial callback
+    confirmCallback: null,
+    library: [],
+    libraryPagination: { page: 1, pageSize: 10, total: 0 },
+    selectedLibImages: new Set()
 };
 
 // --- Toast Factory ---
@@ -533,7 +536,10 @@ async function refreshUsers() {
                 <td><span class="status-badge bg-pending" style="background:#e5e7eb; color:#374151;">${u.role}</span></td>
                 <td>${formatTime(u.createdAt)}</td>
                 <td>
-                    ${u.username === 'admin' ? '-' : `<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">删除</button>`}
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-secondary btn-sm" onclick="showChangePasswordModal(${u.id}, '${u.username}')">编辑</button>
+                        ${u.username === 'admin' ? '' : `<button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">删除</button>`}
+                    </div>
                 </td>
             </tr>
         `).join('');
@@ -582,6 +588,10 @@ function switchTab(tab) {
         document.getElementById('tasksPanel').style.display = 'block';
         document.querySelectorAll('a[onclick="switchTab(\'tasks\')"]').forEach(e => e.classList.add('active'));
         refreshTasks();
+    } else if (tab === 'library') {
+        document.getElementById('libraryPanel').style.display = 'block';
+        document.querySelectorAll('a[onclick="switchTab(\'library\')"]').forEach(e => e.classList.add('active'));
+        refreshLibrary();
     } else if (tab === 'admin') {
         document.getElementById('adminPanel').style.display = 'block';
         document.getElementById('adminTab').classList.add('active');
@@ -589,11 +599,258 @@ function switchTab(tab) {
     }
 }
 
-function showCreateTaskModal() { document.getElementById('createModal').classList.add('show'); }
+function showCreateTaskModal() {
+    document.getElementById('createModal').classList.add('show');
+    refreshQuickLibrary();
+}
 function hideCreateTaskModal() { document.getElementById('createModal').classList.remove('show'); }
 function showCreateUserModal() { document.getElementById('createUserModal').classList.add('show'); }
 function hideCreateUserModal() { document.getElementById('createUserModal').classList.remove('show'); }
+function showAddLibraryImageModal() { document.getElementById('addLibraryModal').classList.add('show'); }
+function hideAddLibraryModal() { document.getElementById('addLibraryModal').classList.remove('show'); }
 function hideDetailModal() { document.getElementById('detailModal').classList.remove('show'); state.currentTaskId = null; }
+
+// --- Password Change Functions ---
+function showChangePasswordModal(userId, username) {
+    document.getElementById('pwTargetUserId').value = userId;
+    document.getElementById('pwTargetUsername').value = username;
+    document.getElementById('pwNewPassword').value = '';
+    document.getElementById('pwConfirmPassword').value = '';
+    document.getElementById('changePasswordModal').classList.add('show');
+}
+
+function showChangeMyPasswordModal() {
+    const user = state.user;
+    if (user) {
+        showChangePasswordModal(user.id, user.username);
+    }
+}
+
+function hideChangePasswordModal() {
+    document.getElementById('changePasswordModal').classList.remove('show');
+}
+
+async function changePassword(event) {
+    event.preventDefault();
+    const userId = document.getElementById('pwTargetUserId').value;
+    const newPassword = document.getElementById('pwNewPassword').value;
+    const confirmPassword = document.getElementById('pwConfirmPassword').value;
+
+    if (newPassword !== confirmPassword) {
+        showToast('两次密码输入不一致', 'error');
+        return;
+    }
+
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/users/${userId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password: newPassword })
+        });
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Failed');
+        }
+        showToast('密码修改成功');
+        hideChangePasswordModal();
+    } catch (error) {
+        showToast(error.message, 'error');
+    }
+}
+
+// --- Library Management Functions ---
+async function refreshLibrary() {
+    const { page, pageSize } = state.libraryPagination;
+    const offset = (page - 1) * pageSize;
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/library?limit=${pageSize}&offset=${offset}`);
+        const data = await response.json();
+        state.library = data.images || [];
+        state.libraryPagination.total = data.total || 0;
+        renderLibrary();
+        updateLibPaginationUI();
+    } catch (error) {
+        console.error('Failed to fetch library:', error);
+    }
+}
+
+function renderLibrary() {
+    const tbody = document.getElementById('libraryListBody');
+    const images = state.library;
+
+    // Update Select All checkbox
+    const selectAllCheckbox = document.getElementById('libSelectAll');
+    if (selectAllCheckbox) {
+        selectAllCheckbox.checked = images.length > 0 && images.every(img => state.selectedLibImages.has(img.id));
+        selectAllCheckbox.indeterminate = images.some(img => state.selectedLibImages.has(img.id)) && !images.every(img => state.selectedLibImages.has(img.id));
+    }
+
+    // Update Batch Delete Button
+    const batchBtn = document.getElementById('libBatchDeleteBtn');
+    if (batchBtn) {
+        batchBtn.style.display = state.selectedLibImages.size > 0 ? 'inline-flex' : 'none';
+        batchBtn.innerHTML = `<svg class="icon" viewBox="0 0 24 24"><path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"/></svg> 批量删除 (${state.selectedLibImages.size})`;
+    }
+
+    if (images.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">暂无镜像数据</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = images.map(img => `
+        <tr>
+            <td class="col-checkbox"><input type="checkbox" onchange="toggleLibImageSelection(${img.id})" ${state.selectedLibImages.has(img.id) ? 'checked' : ''}></td>
+            <td style="font-weight: 500;">${img.name}</td>
+            <td style="font-family: monospace; font-size: 13px; color: #3b82f6;">${img.image}</td>
+            <td style="color: #64748b;">${formatTime(img.createdAt)}</td>
+            <td>
+                <button class="btn btn-danger btn-sm" onclick="deleteLibraryImage(${img.id})">删除</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function toggleLibImageSelection(id) {
+    if (state.selectedLibImages.has(id)) state.selectedLibImages.delete(id);
+    else state.selectedLibImages.add(id);
+    renderLibrary();
+}
+
+function toggleLibSelectAll() {
+    const images = state.library;
+    const allSelected = images.length > 0 && images.every(img => state.selectedLibImages.has(img.id));
+    if (allSelected) images.forEach(img => state.selectedLibImages.delete(img.id));
+    else images.forEach(img => state.selectedLibImages.add(img.id));
+    renderLibrary();
+}
+
+async function executeLibBatchDelete() {
+    if (state.selectedLibImages.size === 0) return;
+    showConfirm('批量删除', `确定要删除选中的 ${state.selectedLibImages.size} 个镜像吗?`, async () => {
+        let count = 0;
+        for (const id of state.selectedLibImages) {
+            try {
+                await fetchWithAuth(`${API_BASE}/library/${id}`, { method: 'DELETE' });
+                count++;
+            } catch (e) { console.error(e); }
+        }
+        showToast(`成功删除 ${count} 个镜像`);
+        state.selectedLibImages.clear();
+        refreshLibrary();
+    });
+}
+
+function updateLibPaginationUI() {
+    const { page, pageSize, total } = state.libraryPagination;
+    const start = Math.min((page - 1) * pageSize + 1, total);
+    const end = Math.min(start + pageSize - 1, total);
+    document.getElementById('libPageStart').innerText = total === 0 ? 0 : start;
+    document.getElementById('libPageEnd').innerText = end;
+    document.getElementById('libTotalItems').innerText = total;
+    document.getElementById('libCurrentPageNum').innerText = page;
+    document.getElementById('libPrevBtn').disabled = page <= 1;
+    document.getElementById('libNextBtn').disabled = end >= total;
+    document.getElementById('libPageSizeSelect').value = pageSize;
+}
+
+function libNextPage() {
+    const { page, pageSize, total } = state.libraryPagination;
+    if (page * pageSize < total) { state.libraryPagination.page++; refreshLibrary(); }
+}
+function libPrevPage() {
+    if (state.libraryPagination.page > 1) { state.libraryPagination.page--; refreshLibrary(); }
+}
+function changeLibPageSize() {
+    state.libraryPagination.pageSize = parseInt(document.getElementById('libPageSizeSelect').value);
+    state.libraryPagination.page = 1;
+    refreshLibrary();
+}
+
+async function addLibraryImage(event) {
+    event.preventDefault();
+    const imagesStr = document.getElementById('libImages').value;
+    const lines = imagesStr.split('\n').map(l => l.trim()).filter(l => l);
+
+    if (lines.length === 0) return;
+
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const image of lines) {
+        // Auto-extract name: cr01.home.lan/library/n8n:v0.1.1 -> n8n:v0.1.1
+        const name = image.split('/').pop();
+
+        try {
+            await fetchWithAuth(`${API_BASE}/library`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, image })
+            });
+            successCount++;
+        } catch (error) {
+            console.error(`Failed to add ${image}:`, error);
+            failCount++;
+        }
+    }
+
+    if (failCount === 0) {
+        showToast(`成功添加 ${successCount} 个镜像`);
+    } else {
+        showToast(`部分添加成功 (${successCount} 成功, ${failCount} 失败)`, 'error');
+    }
+
+    hideAddLibraryModal();
+    document.getElementById('addLibraryForm').reset();
+    refreshLibrary();
+}
+
+async function deleteLibraryImage(id) {
+    showConfirm('删除镜像', '确定要从库中删除此常用镜像吗?', async () => {
+        try {
+            await fetchWithAuth(`${API_BASE}/library/${id}`, { method: 'DELETE' });
+            showToast('镜像已删除');
+            refreshLibrary();
+        } catch (error) {
+            showToast(error.message, 'error');
+        }
+    });
+}
+
+async function refreshQuickLibrary() {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/library?limit=100`);
+        const data = await response.json();
+        const images = data.images || [];
+        const list = document.getElementById('quickLibraryList');
+        if (images.length === 0) {
+            list.innerHTML = '<div style="font-size: 12px; color: #94a3b8; text-align: center; margin-top: 20px;">库中暂无镜像</div>';
+            return;
+        }
+
+        list.innerHTML = images.map(img => `
+            <div class="library-item" onclick="pickImage('${img.image}')" style="padding: 8px; background: white; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 6px; cursor: pointer; transition: all 0.2s;">
+                <div style="font-size: 13px; font-weight: 600; color: #1e293b;">${img.name}</div>
+                <div style="font-size: 11px; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${img.image}</div>
+            </div>
+        `).join('');
+
+        // Add hover effect via CSS classes if needed, or inline
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+function pickImage(imageUrl) {
+    const textarea = document.getElementById('images');
+    const current = textarea.value.trim();
+    if (current.includes(imageUrl)) {
+        showToast('该镜像已在列表中');
+        return;
+    }
+    textarea.value = (current ? current + '\n' : '') + imageUrl;
+    showToast('镜像已添加');
+}
+
 
 function formatTime(s) {
     if (!s) return '-';

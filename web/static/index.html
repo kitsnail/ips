@@ -253,6 +253,7 @@
             <h1>镜像预热控制台（IPS）</h1>
             <nav class="nav-tabs">
                 <a class="nav-link active" onclick="switchTab('tasks')">任务管理</a>
+                <a class="nav-link" onclick="switchTab('library')">镜像库</a>
                 <a class="nav-link" id="adminTab" onclick="switchTab('admin')" style="display: none;">系统设置</a>
             </nav>
             <div id="userInfo">
@@ -261,6 +262,8 @@
                         id="userAvatar">U</div>
                     <span id="currentUsername"></span>
                 </div>
+                <div style="height: 16px; width: 1px; background: #e5e7eb;"></div>
+                <a href="#" onclick="showChangeMyPasswordModal()">修改密码</a>
                 <div style="height: 16px; width: 1px; background: #e5e7eb;"></div>
                 <a href="#" onclick="logout()">退出登录</a>
             </div>
@@ -633,7 +636,7 @@
             /* Create Task Grid Layout */
             .create-grid {
                 display: grid;
-                grid-template-columns: 350px 1fr;
+                grid-template-columns: 350px 1fr 280px;
                 gap: 24px;
                 height: 100%;
             }
@@ -641,6 +644,21 @@
             .config-pane {
                 border-right: 1px solid #e5e7eb;
                 padding-right: 24px;
+            }
+
+            .library-picker-pane {
+                border-left: 1px solid #e5e7eb;
+                padding-left: 24px;
+                display: flex;
+                flex-direction: column;
+                overflow-y: auto;
+            }
+
+            .library-item:hover {
+                border-color: #3b82f6 !important;
+                background-color: #eff6ff !important;
+                transform: translateY(-1px);
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
             }
 
             .editor-pane {
@@ -851,6 +869,67 @@
                 </div>
             </div>
         </div>
+
+        <!-- 镜像库面板 -->
+        <div id="libraryPanel" class="tab-panel" style="display: none;">
+            <div class="action-bar">
+                <button class="btn btn-primary" onclick="showAddLibraryImageModal()">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    添加镜像
+                </button>
+                <button id="libBatchDeleteBtn" class="btn btn-danger" onclick="executeLibBatchDelete()"
+                    style="display: none;">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path
+                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
+                    批量删除
+                </button>
+                <div style="margin-left: auto; color: #64748b; font-size: 14px; font-weight: 500;">常用镜像库</div>
+            </div>
+
+            <div class="card" style="padding: 0;">
+                <div class="table-container">
+                    <table class="data-grid">
+                        <thead>
+                            <tr>
+                                <th class="col-checkbox"><input type="checkbox" id="libSelectAll"
+                                        onchange="toggleLibSelectAll()"></th>
+                                <th>显示名称</th>
+                                <th>镜像地址</th>
+                                <th>添加时间</th>
+                                <th style="width: 120px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="libraryListBody">
+                            <!-- 镜像数据动态加载 -->
+                        </tbody>
+                    </table>
+                </div>
+                <!-- 分页控制区 -->
+                <div class="pagination-footer">
+                    <div class="pagination-info">
+                        显示 <span id="libPageStart">0</span> - <span id="libPageEnd">0</span> 共 <span
+                            id="libTotalItems">0</span> 项
+                    </div>
+                    <div class="pagination-controls">
+                        <span style="font-size: 13px; color: #64748b;">每页</span>
+                        <select id="libPageSizeSelect" class="form-input" style="width: auto; padding: 4px 8px;"
+                            onchange="changeLibPageSize()">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                        </select>
+                        <button id="libPrevBtn" class="btn btn-secondary btn-sm" onclick="libPrevPage()"
+                            disabled>上一页</button>
+                        <span style="font-size: 13px; color: #111827;">第 <span id="libCurrentPageNum">1</span> 页</span>
+                        <button id="libNextBtn" class="btn btn-secondary btn-sm" onclick="libNextPage()">下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
     <!-- 创建任务模态框 -->
     <div id="createModal" class="modal">
@@ -880,6 +959,13 @@
                                 class="form-input editor-input" id="images"
                                 placeholder="docker.io/library/nginx:latest&#10;registry.hub.docker.com/library/redis:7"
                                 required></textarea></div>
+                        <div class="library-picker-pane">
+                            <label class="form-label">从镜像库选择</label>
+                            <div id="quickLibraryList"
+                                style="flex: 1; overflow-y: auto; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px;">
+                                <!-- 快捷选择列表 -->
+                            </div>
+                        </div>
                     </div>
                 </form>
             </div>
@@ -900,6 +986,29 @@
                     id="cancelTaskBtn" onclick="cancelCurrentTask()" style="display:none;">取消任务</button></div>
         </div>
     </div>
+    <!-- 添加镜像库镜像模态框 -->
+    <div id="addLibraryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">添加常用镜像</div>
+            <div class="modal-body">
+                <form id="addLibraryForm" onsubmit="addLibraryImage(event)">
+                    <div class="form-group">
+                        <label class="form-label">镜像列表 (每行一个镜像)</label>
+                        <textarea id="libImages" class="form-input" style="height: 200px; font-family: monospace;"
+                            placeholder="docker.io/library/nginx:latest&#10;cr01.home.lan/library/n8n:v0.1.1"
+                            required></textarea>
+                        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">* 显示名将根据镜像路径自动生成</div>
+                    </div>
+                </form>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="hideAddLibraryModal()">取消</button>
+                <button type="button" class="btn btn-primary"
+                    onclick="document.getElementById('addLibraryForm').requestSubmit()">保存</button>
+            </div>
+        </div>
+    </div>
+
     <!-- 登录遮罩 -->
     <div id="loginOverlay">
         <div class="login-card">
@@ -932,6 +1041,34 @@
             <div class="form-actions"><button type="button" class="btn btn-secondary"
                     onclick="hideCreateUserModal()">取消</button><button type="button" class="btn btn-primary"
                     onclick="document.getElementById('createUserForm').requestSubmit()">确认创建</button>
+            </div>
+        </div>
+    </div>
+    <!-- 修改密码模态框 -->
+    <div id="changePasswordModal" class="modal">
+        <div class="modal-content" style="height: auto; width: 400px; max-width: 90vw;">
+            <div class="modal-header">修改密码</div>
+            <div class="modal-body">
+                <form id="changePasswordForm" onsubmit="changePassword(event)">
+                    <input type="hidden" id="pwTargetUserId">
+                    <div class="form-group">
+                        <label class="form-label">目标用户</label>
+                        <input type="text" id="pwTargetUsername" class="form-input" disabled>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">新密码 * (至少6位)</label>
+                        <input type="password" id="pwNewPassword" class="form-input" required minlength="6">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">确认新密码 *</label>
+                        <input type="password" id="pwConfirmPassword" class="form-input" required minlength="6">
+                    </div>
+                </form>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="hideChangePasswordModal()">取消</button>
+                <button type="button" class="btn btn-primary"
+                    onclick="document.getElementById('changePasswordForm').requestSubmit()">保存</button>
             </div>
         </div>
     </div>

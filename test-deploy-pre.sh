@@ -1,6 +1,6 @@
 #!/bin/bash
 
-docker rmi ips-apiserver:latest 
+docker rmi ips-apiserver:dev 
 
 make docker-build-dev
 

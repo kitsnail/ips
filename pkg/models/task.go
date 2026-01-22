@@ -70,3 +70,11 @@ func (t *Task) CalculateProgress() {
 	completed := t.Progress.CompletedNodes
 	t.Progress.Percentage = float64(completed) / float64(total) * 100
 }
+
+// LibraryImage 代表镜像库中的一个镜像
+type LibraryImage struct {
+	ID        int64     `json:"id"`
+	Name      string    `json:"name"`
+	Image     string    `json:"image"`
+	CreatedAt time.Time `json:"createdAt"`
+}

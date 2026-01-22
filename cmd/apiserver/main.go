@@ -134,7 +134,7 @@ func main() {
 	logger.Info("Task manager initialized")
 
 	// 6. 设置路由
-	router := api.SetupRouter(logger, taskManager, authService, repo)
+	router := api.SetupRouter(logger, taskManager, authService, repo, repo)
 
 	// 6. 创建HTTP服务器
 	port := os.Getenv("SERVER_PORT")

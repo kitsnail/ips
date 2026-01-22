@@ -53,3 +53,13 @@ type UserRepository interface {
 	ListTokens(ctx context.Context, userID int64) ([]*models.APIToken, error)
 	DeleteToken(ctx context.Context, id int64) error
 }
+
+// LibraryRepository 镜像库存储接口
+type LibraryRepository interface {
+	// SaveImage 保存镜像到库
+	SaveImage(ctx context.Context, img *models.LibraryImage) error
+	// ListImages 列出库中的镜像 (分页)
+	ListImages(ctx context.Context, offset, limit int) ([]*models.LibraryImage, int, error)
+	// DeleteImage 从库中删除镜像
+	DeleteImage(ctx context.Context, id int64) error
+}
