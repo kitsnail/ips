@@ -97,35 +97,12 @@ docker-build: ## 构建 Docker 镜像
 
 docker-build-dev: build ## 构建 Docker 镜像 (开发模式，使用宿主机二进制)
 	@echo "$(GREEN)Building Docker image $(DOCKER_IMAGE):$(DOCKER_TAG) (Dev mode)...$(RESET)"
-	@docker build --platform linux/amd64 -f Dockerfile-dev -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
-	@docker tag $(DOCKER_IMAGE):$(DOCKER_TAG) $(DOCKER_IMAGE):latest
+	@docker build --platform linux/amd64 -f Dockerfile-dev -t $(DOCKER_IMAGE):dev .
 
 docker-build-no-cache: ## 构建 Docker 镜像（不使用缓存）
 	@echo "$(GREEN)Building Docker image (no cache)...$(RESET)"
 	@docker build --no-cache -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 
-docker-run: ## 运行 Docker 容器
-	@echo "$(GREEN)Running Docker container...$(RESET)"
-	@docker run -d \
-		--name $(DOCKER_IMAGE) \
-		-p $(SERVER_PORT):$(SERVER_PORT) \
-		-v ~/.kube/config:/home/ips/.kube/config:ro \
-		-e K8S_NAMESPACE=default \
-		-e WORKER_IMAGE=busybox:latest \
-		$(DOCKER_IMAGE):$(DOCKER_TAG)
-	@echo "$(GREEN)Container started: http://localhost:$(SERVER_PORT)$(RESET)"
-
-docker-stop: ## 停止 Docker 容器
-	@echo "$(GREEN)Stopping Docker container...$(RESET)"
-	@docker stop $(DOCKER_IMAGE) || true
-	@docker rm $(DOCKER_IMAGE) || true
-
-docker-logs: ## 查看 Docker 容器日志
-	@docker logs -f $(DOCKER_IMAGE)
-
-docker-clean: docker-stop ## 清理 Docker 资源
-	@echo "$(GREEN)Cleaning Docker resources...$(RESET)"
-	@docker rmi $(DOCKER_IMAGE):$(DOCKER_TAG) || true
 
 ##@ 其他
 

@@ -26,7 +26,7 @@ spec:
         fsGroup: 1000
       containers:
         - name: apiserver
-          image: 192.168.3.81/library/ips-apiserver:latest
+          image: 192.168.3.81/library/ips-apiserver:dev
           imagePullPolicy: Always
           ports:
             - name: http

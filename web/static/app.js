@@ -413,8 +413,8 @@ async function createTask(event) {
         maxRetries: parseInt(document.getElementById('maxRetries').value),
         retryStrategy: document.getElementById('retryStrategy').value,
         retryDelay: parseInt(document.getElementById('retryDelay').value),
-        webhookUrl: document.getElementById('webhookUrl').value.trim(),
-        nodeSelector: document.getElementById('nodeSelector').value.trim() ? JSON.parse(document.getElementById('nodeSelector').value) : null
+        webhookUrl: document.getElementById('webhookUrl')?.value.trim() || '',
+        nodeSelector: document.getElementById('nodeSelector')?.value.trim() ? JSON.parse(document.getElementById('nodeSelector').value) : null
     };
 
     try {
