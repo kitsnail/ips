@@ -1,437 +1,139 @@
 # Image Prewarm Service (IPS)
 
-镜像预热服务 - 一个用于在 Kubernetes 集群中批量预热容器镜像的 RESTful API 服务。
+<div align="center">
 
-## 功能特性
+![Go Version](https://img.shields.io/badge/go-1.23+-00ADD8?style=flat&logo=go)
+![Kubernetes](https://img.shields.io/badge/kubernetes-v1.20+-326CE5?style=flat&logo=kubernetes)
+![License](https://img.shields.io/badge/license-MIT-green)
+[![Go Report Card](https://goreportcard.com/badge/github.com/kitsnail/ips)](https://goreportcard.com/report/github.com/kitsnail/ips)
 
-### 核心功能
-- ✅ RESTful API 接口，易于集成
-- ✅ **Web UI 管理界面**（可视化任务管理）
-- ✅ 批次调度，支持自定义批次大小
-- ✅ 节点选择器，支持按标签过滤节点
-- ✅ 实时进度跟踪（基于 Kubernetes Watch 机制）
-- ✅ 失败节点详情记录
-- ✅ 任务生命周期管理（创建、查询、取消）
+**IPS (Image Prewarm Service) 是一个专为 Kubernetes 集群设计的高性能容器镜像预热服务。**
+它通过 RESTful API 和可视化的 Web 界面，帮助用户在集群节点上批量、快速地预拉取镜像，从而显著减少应用启动时的镜像拉取延迟。
 
-### 高级特性
-- ✅ **任务优先级队列**（1-10 级，支持紧急任务优先执行）
-- ✅ **自动重试机制**（支持线性和指数退避策略）
-- ✅ **Webhook 通知**（任务完成/失败/取消自动通知）
-- ✅ **并发控制**（防止资源耗尽，默认最大 3 个并发任务）
-- ✅ **Prometheus 监控指标**（任务统计、耗时、节点处理等 9 种指标）
+[功能特性](#-功能特性) • [快速开始](#-快速开始) • [文档](#-文档) • [架构](#-架构设计) • [贡献](#-参与贡献)
 
-### 部署与运维
-- ✅ 内存存储（轻量级，适合短期任务）
-- ✅ Docker 容器化支持
-- ✅ Kubernetes 完整部署配置
-- ✅ 水平自动扩缩容（HPA）
-- ✅ 健康检查和优雅关闭
-- ✅ 完善的单元测试和集成测试
+</div>
 
-## 快速开始
+---
 
-### 方式一：本地开发
+## 📖 简介
 
-#### 前提条件
+在 Kubernetes 集群中，Pod 的启动时间很大程度上取决于镜像拉取的速度。对于大镜像或网络环境不佳的场景，即时拉取会导致显著的启动延迟。IPS 旨在解决这一问题，它提供了一个中心化的控制台，允许管理员按需或定时将镜像分发到指定节点，确保业务容器能够“秒级”启动。
 
-- Go 1.23+
-- Kubernetes 集群访问权限
-- kubectl 配置（本地测试）或 in-cluster 配置（生产环境）
+## ✨ 功能特性
 
-#### 编译
+### � 核心能力
+- **批量预热**：支持一次性对成百上千个节点进行镜像预拉取。
+- **智能调度**：
+  - **并发控制**：内置信号量机制，防止大规模并发拉取耗尽节点网络带宽。
+  - **批次处理**：支持自定义批次大小，平滑执行预热任务。
+- **灵活筛选**：基于 Label Selector 的节点筛选机制，支持精细化的节点分组预热。
+
+### 🖥️ 可视化管理 (Web UI)
+- **实时看板**：直观展示任务进度、成功/失败节点数及详细状态。
+- **任务管理**：支持任务的创建、查询、**批量删除**和**一键取消**。
+- **用户友好**：
+  - **交互优化**：采用现代化的 Toast 通知和确认模态框，拒绝原生弹窗。
+  - **状态过滤**：支持按 Pending, Running, Completed 等状态快速筛选任务。
+  - **移动端适配**：响应式布局，随时随地管理任务。
+
+### 🛡️ 企业级特性
+- **高可用架构**：支持多副本部署，配合 HPA 自动扩缩容。
+- **安全性**：
+  - JWT 身份认证。
+  - 基于角色的访问控制 (RBAC)。
+- **可观测性**：
+  - 丰富的 Prometheus 指标（任务耗时、成功率、队列深度等）。
+  - Webhook 通知集成（支持钉钉、Slack 等）。
+- **多租户支持**：完善的用户管理和权限隔离。
+
+## 🛠️ 快速开始
+
+### 前提条件
+- Kubernetes 1.20+ 集群
+- `kubectl` 已配置并连接到集群
+- Docker (用于构建镜像)
+
+### 方式一：Kubernetes 部署 (推荐)
+
+使用 Kustomize 一键部署到集群：
 
 ```bash
+# 1. 部署所有组件 (API Server, Service, HPA, RBAC 等)
+kubectl apply -k deploy/
+
+# 2. 验证部署状态
+kubectl get pods -n ips-system
+```
+
+### 方式二：本地开发运行
+
+```bash
+# 1. 编译二进制文件
 make build
-```
 
-#### 运行
-
-```bash
-# 使用默认配置运行
+# 2. 运行服务 (默认端口 8080)
 make run
-
-# 或直接运行二进制文件
-./bin/apiserver
-
-# 使用环境变量配置
-SERVER_PORT=8080 K8S_NAMESPACE=default WORKER_IMAGE=busybox:latest ./bin/apiserver
 ```
 
-#### 测试
+服务启动后，访问：
+- **Web UI**: [http://localhost:8080/](http://localhost:8080/)
+- **API Health**: [http://localhost:8080/health](http://localhost:8080/health)
+
+### 方式三：Docker 运行
 
 ```bash
-# 运行自动化测试脚本
-./test-api.sh
-
-# 或手动测试
-curl http://localhost:8080/health
-```
-
-### 使用 Web UI
-
-服务启动后，可以通过浏览器访问 Web 管理界面：
-
-```
-http://localhost:8080/
-或
-http://localhost:8080/web/
-```
-
-Web UI 功能：
-- 📊 **任务列表视图** - 实时查看所有任务状态和进度
-- ➕ **创建任务** - 可视化表单创建新的镜像预热任务
-- 🔍 **任务详情** - 查看任务完整信息、进度和失败节点详情
-- 🎯 **状态筛选** - 按任务状态快速筛选
-- ❌ **取消任务** - 一键取消运行中的任务
-- 🔄 **自动刷新** - 每 5 秒自动更新任务状态
-
-### 使用 API
-
-查看 [API 文档](#api-文档) 了解如何通过 RESTful API 管理任务。
-
-### 方式二：Docker 部署
-
-#### 使用 Docker
-
-```bash
-# 构建镜像
-make docker-build
-
-# 运行容器
 docker run -d \
   --name ips-apiserver \
   -p 8080:8080 \
   -v ~/.kube/config:/home/ips/.kube/config:ro \
-  -e K8S_NAMESPACE=default \
-  -e WORKER_IMAGE=busybox:latest \
   ips-apiserver:latest
 ```
 
-#### 使用 Docker Compose
+## 📦 项目结构
 
-```bash
-# 启动服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
-
-# 停止服务
-docker-compose down
-```
-
-### 方式三：Kubernetes 部署
-
-```bash
-# 快速部署
-make k8s-deploy
-
-# 或手动部署
-kubectl apply -f deploy/
-
-# 查看部署状态
-kubectl get all -n ips-system
-
-# 查看日志
-kubectl logs -l app=ips -n ips-system -f
-```
-
-详细的部署指南请参考 [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md)。
-
-## API 文档
-
-### 健康检查
-
-```bash
-# 健康检查
-GET /health
-
-# 就绪检查 (同 /health)
-GET /readyz
-```
-
-### 创建任务
-
-```bash
-POST /api/v1/tasks
-Content-Type: application/json
-
-{
-  "images": ["nginx:latest", "redis:7"],
-  "batchSize": 10,
-  "priority": 5,              # 可选，优先级 1-10，默认 5
-  "maxRetries": 3,            # 可选，最大重试次数 0-5，默认 0
-  "retryStrategy": "linear",  # 可选，重试策略: linear 或 exponential，默认 linear
-  "retryDelay": 30,           # 可选，重试延迟（秒），默认 30
-  "webhookUrl": "https://example.com/webhook",  # 可选，任务完成通知
-  "nodeSelector": {           # 可选，节点选择器
-    "workload": "compute"
-  }
-}
-```
-
-**响应示例：**
-
-```json
-{
-  "taskId": "task-20260116-151234-a1b2c3d4",
-  "status": "pending",
-  "priority": 5,
-  "images": ["nginx:latest", "redis:7"],
-  "batchSize": 10,
-  "maxRetries": 3,
-  "retryCount": 0,
-  "retryStrategy": "linear",
-  "createdAt": "2026-01-16T15:12:34Z"
-}
-```
-
-### 查询任务详情
-
-```bash
-GET /api/v1/tasks/:id
-```
-
-**响应示例：**
-
-```json
-{
-  "taskId": "task-20260116-151234-a1b2c3d4",
-  "status": "running",
-  "images": ["nginx:latest", "redis:7"],
-  "batchSize": 10,
-  "progress": {
-    "totalNodes": 50,
-    "completedNodes": 25,
-    "failedNodes": 2,
-    "currentBatch": 3,
-    "totalBatches": 5,
-    "percentage": 50.0
-  },
-  "failedNodeDetails": [
-    {
-      "nodeName": "node-5",
-      "reason": "JobFailed",
-      "message": "ImagePullBackOff",
-      "timestamp": "2026-01-16T15:15:30Z"
-    }
-  ],
-  "createdAt": "2026-01-16T15:12:34Z",
-  "startedAt": "2026-01-16T15:12:35Z"
-}
-```
-
-### 列出任务
-
-```bash
-# 列出所有任务
-GET /api/v1/tasks
-
-# 按状态过滤
-GET /api/v1/tasks?status=running&limit=20&offset=0
-```
-
-**查询参数：**
-- `status`: 任务状态（pending/running/completed/failed/cancelled）
-- `limit`: 返回数量（默认 10，最大 100）
-- `offset`: 偏移量（用于分页）
-
-**响应示例：**
-
-```json
-{
-  "tasks": [
-    {
-      "taskId": "task-20260116-151234-a1b2c3d4",
-      "status": "running",
-      "images": ["nginx:latest"],
-      "progress": {
-        "totalNodes": 50,
-        "completedNodes": 25,
-        "percentage": 50.0
-      },
-      "createdAt": "2026-01-16T15:12:34Z"
-    }
-  ],
-  "total": 1,
-  "limit": 20,
-  "offset": 0
-}
-```
-
-### 取消任务
-
-```bash
-DELETE /api/v1/tasks/:id
-```
-
-**响应示例：**
-
-```json
-{
-  "taskId": "task-20260116-151234-a1b2c3d4",
-  "status": "cancelled",
-  "message": "Task cancelled successfully"
-}
-```
-
-## 环境变量配置
-
-| 变量 | 说明 | 默认值 |
-|------|------|--------|
-| `SERVER_PORT` | HTTP 服务端口 | `8080` |
-| `K8S_NAMESPACE` | Kubernetes 命名空间 | `default` |
-| `WORKER_IMAGE` | Worker 镜像 | `busybox:latest` |
-
-## 使用示例
-
-### 使用 curl
-
-```bash
-# 创建预热任务
-TASK_ID=$(curl -X POST http://localhost:8080/api/v1/tasks \
-  -H "Content-Type: application/json" \
-  -d '{
-    "images": ["nginx:latest", "redis:7"],
-    "batchSize": 10
-  }' | jq -r .taskId)
-
-echo "Task created: $TASK_ID"
-
-# 查询任务状态
-curl http://localhost:8080/api/v1/tasks/$TASK_ID | jq .
-
-# 取消任务
-curl -X DELETE http://localhost:8080/api/v1/tasks/$TASK_ID | jq .
-```
-
-### 使用 Python
-
-参见 [client/python/](client/python/) 目录。
-
-## 架构设计
-
-详细架构和开发计划请参考：
-- [RESTful-API.md](RESTful-API.md) - API 设计文档
-- [development-plan.md](development-plan.md) - 开发流程方案
-
-## 项目结构
+遵循标准的 Go 项目布局：
 
 ```
 ips/
-├── cmd/
-│   └── apiserver/          # HTTP 服务入口
-├── internal/
-│   ├── api/                # HTTP 路由和中间件
-│   │   ├── handler/        # API 处理器
-│   │   └── middleware/     # 中间件
-│   ├── service/            # 业务逻辑层
-│   ├── repository/         # 存储层
-│   └── k8s/                # K8s 客户端封装
-├── pkg/
-│   └── models/             # 数据模型
-├── deploy/                 # K8s 部署配置
-│   ├── namespace.yaml      # 命名空间
-│   ├── rbac.yaml           # RBAC 权限
-│   ├── configmap.yaml      # 配置
-│   ├── deployment.yaml     # 部署配置
-│   ├── service.yaml        # 服务
-│   ├── ingress.yaml        # Ingress
-│   ├── hpa.yaml            # 水平自动扩缩容
-│   ├── pdb.yaml            # Pod 中断预算
-│   ├── resource-quota.yaml # 资源配额
-│   ├── kustomization.yaml  # Kustomize 配置
-│   └── DEPLOYMENT.md       # 部署指南
-├── client/                 # 客户端 SDK
-│   └── python/             # Python 客户端
-├── Dockerfile              # Docker 镜像构建
-├── docker-compose.yml      # Docker Compose 配置
-├── Makefile                # 构建和部署命令
-└── README.md               # 项目文档
+├── cmd/                # 主程序入口
+├── internal/           # 私有应用代码
+│   ├── api/            # API 路由与处理器
+│   ├── service/        # 核心业务逻辑
+│   ├── repository/     # 数据持久层
+│   └── k8s/            # Kubernetes Client 封装
+├── pkg/                # 公共库代码
+├── deploy/             # Kubernetes 部署清单
+├── web/                # 前端静态资源
+└── scripts/            # 辅助脚本
 ```
 
-## 开发
+## 🧩 架构设计
 
-### 常用命令
+IPS 采用了典型的分层架构，确保了系统的高内聚低耦合：
+
+- **接入层**：基于 Gin 框架的 RESTful API，提供统一的入口。
+- **业务层**：TaskManager 负责任务的生命周期管理，BatchScheduler 负责任务的分批调度。
+- **执行层**：通过 Kubernetes Job 或直接调用 CRI 接口（规划中）在节点上执行拉取操作。
+- **存储层**：支持 SQLite（默认）及 MySQL 等多种存储后端。
+
+详细设计文档请参阅：[docs/ARCHITECTURE.md](plan-arch.md)
+
+## 📚 文档
+
+- [API 接口文档](RESTful-API.md)
+- [部署操作指南](deploy/DEPLOYMENT.md)
+- [开发演进计划](development-plan.md)
+
+## 🤝 参与贡献
+
+欢迎提交 Pull Request 或 Issue！在提交代码前，请确保通过了所有测试和代码检查：
 
 ```bash
-# 格式化代码
-make fmt
-
-# 代码检查
 make lint
-
-# 运行测试
 make test
-
-# 清理构建产物
-make clean
-
-# 构建二进制文件
-make build
-
-# 本地运行
-make run
 ```
 
-### Docker 相关
+## 📄 许可证
 
-```bash
-# 构建 Docker 镜像
-make docker-build
-
-# 运行 Docker 容器
-make docker-run
-
-# 停止 Docker 容器
-make docker-stop
-
-# 使用 Docker Compose
-make docker-compose-up
-make docker-compose-down
-```
-
-- push
-```bash
-skopeo copy \
-  --override-os linux \
-  --override-arch arm64 \
-  --dest-tls-verify=false \
-  --dest-creds admin:Harbor12345 \
-  docker-daemon:ips-apiserver:latest \
-  docker://cr01.home.lan/library/ips-apiserver:latest
-```
-
-### Kubernetes 相关
-
-```bash
-# 部署到 Kubernetes
-make k8s-deploy
-
-# 查看部署状态
-make k8s-status
-
-# 查看日志
-make k8s-logs
-
-# 删除部署
-make k8s-delete
-
-# 端口转发（本地访问）
-make k8s-port-forward
-```
-
-### 完整命令列表
-
-运行 `make help` 查看所有可用命令。
-
-## 文档
-
-- [API 设计文档](RESTful-API.md)
-- [部署指南](deploy/DEPLOYMENT.md)
-- [开发计划](development-plan.md)
-- [架构设计](plan-arch.md)
-
-## License
-
-MIT
+本项目采用 [MIT 许可证](LICENSE) 发布。

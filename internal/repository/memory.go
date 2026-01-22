@@ -48,7 +48,7 @@ func (r *MemoryRepository) GetTask(ctx context.Context, id string) (*models.Task
 }
 
 // ListTasks 列出任务
-func (r *MemoryRepository) ListTasks(ctx context.Context) ([]*models.Task, error) {
+func (r *MemoryRepository) ListTasks(ctx context.Context, offset, limit int) ([]*models.Task, int, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -61,7 +61,26 @@ func (r *MemoryRepository) ListTasks(ctx context.Context) ([]*models.Task, error
 		return allTasks[i].CreatedAt.After(allTasks[j].CreatedAt)
 	})
 
-	return allTasks, nil
+	total := len(allTasks)
+
+	// Apply pagination
+	if offset < 0 {
+		offset = 0
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+
+	if offset >= total {
+		return []*models.Task{}, total, nil
+	}
+
+	end := offset + limit
+	if end > total {
+		end = total
+	}
+
+	return allTasks[offset:end], total, nil
 }
 
 // UpdateTask 更新任务

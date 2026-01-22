@@ -143,14 +143,21 @@ func (r *SQLiteRepository) GetTask(ctx context.Context, id string) (*models.Task
 	return &task, nil
 }
 
-func (r *SQLiteRepository) ListTasks(ctx context.Context) ([]*models.Task, error) {
+func (r *SQLiteRepository) ListTasks(ctx context.Context, offset, limit int) ([]*models.Task, int, error) {
+	// Get total count
+	var total int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM tasks").Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
 	query := `SELECT id, images, batch_size, priority, max_retries, retry_delay, retry_strategy, 
 		webhook_url, status, progress, node_statuses, failed_nodes, error_message, created_at, started_at, finished_at 
-		FROM tasks ORDER BY created_at DESC`
+		FROM tasks ORDER BY created_at DESC LIMIT ? OFFSET ?`
 
-	rows, err := r.db.QueryContext(ctx, query)
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer rows.Close()
 
@@ -163,7 +170,7 @@ func (r *SQLiteRepository) ListTasks(ctx context.Context) ([]*models.Task, error
 			&task.WebhookURL, &task.Status, &progressJSON, &nodeStatsJSON, &failedNodesJSON, &task.ErrorMessage,
 			&task.CreatedAt, &task.StartedAt, &task.FinishedAt)
 		if err != nil {
-			return nil, err
+			return nil, 0, err
 		}
 
 		json.Unmarshal(imagesJSON, &task.Images)
@@ -173,7 +180,7 @@ func (r *SQLiteRepository) ListTasks(ctx context.Context) ([]*models.Task, error
 
 		tasks = append(tasks, &task)
 	}
-	return tasks, nil
+	return tasks, total, nil
 }
 
 func (r *SQLiteRepository) DeleteTask(ctx context.Context, id string) error {

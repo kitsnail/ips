@@ -23,7 +23,7 @@ type TaskRepository interface {
 	GetTask(ctx context.Context, id string) (*models.Task, error)
 
 	// ListTasks 列出任务
-	ListTasks(ctx context.Context) ([]*models.Task, error)
+	ListTasks(ctx context.Context, offset, limit int) ([]*models.Task, int, error)
 
 	// UpdateTask 更新任务
 	UpdateTask(ctx context.Context, task *models.Task) error

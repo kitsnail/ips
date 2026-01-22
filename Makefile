@@ -75,11 +75,11 @@ tidy: ## 整理依赖
 
 docker-build: ## 构建 Docker 镜像
 	@echo "$(GREEN)Building Docker image...$(RESET)"
-	@docker build -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@docker build --platform linux/amd64 -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 
 docker-build-dev: build ## 构建 Docker 镜像 (开发模式，使用宿主机二进制)
 	@echo "$(GREEN)Building Docker image (Dev mode)...$(RESET)"
-	@docker build -f Dockerfile-dev -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
+	@docker build --platform linux/amd64 -f Dockerfile-dev -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 
 docker-build-no-cache: ## 构建 Docker 镜像（不使用缓存）
 	@echo "$(GREEN)Building Docker image (no cache)...$(RESET)"

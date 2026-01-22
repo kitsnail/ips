@@ -54,7 +54,7 @@ func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, authSe
 		v1.POST("/tasks", taskHandler.CreateTask)
 		v1.GET("/tasks", taskHandler.ListTasks)
 		v1.GET("/tasks/:id", taskHandler.GetTask)
-		v1.DELETE("/tasks/:id", taskHandler.CancelTask)
+		v1.DELETE("/tasks/:id", taskHandler.DeleteTask)
 
 		// 用户管理 (仅限管理员)
 		users := v1.Group("/users")

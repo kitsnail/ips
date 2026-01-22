@@ -185,13 +185,16 @@ func TestMemoryRepository_ListTasks(t *testing.T) {
 		repo.CreateTask(ctx, task)
 	}
 
-	// 测试列出所有任务
-	allTasks, err := repo.ListTasks(ctx)
+	// Test ListTasks with pagination
+	allTasks, total, err := repo.ListTasks(ctx, 0, 10)
 	if err != nil {
 		t.Fatalf("ListTasks failed: %v", err)
 	}
 
 	if len(allTasks) != 3 {
 		t.Errorf("Expected 3 tasks, got %d", len(allTasks))
+	}
+	if total != 3 {
+		t.Errorf("Expected total 3, got %d", total)
 	}
 }

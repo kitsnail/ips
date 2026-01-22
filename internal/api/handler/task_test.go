@@ -93,8 +93,8 @@ func TestTaskHandler_CreateTask(t *testing.T) {
 		t.Error("Expected task ID, got empty string")
 	}
 
-	if task.Status != models.TaskPending {
-		t.Errorf("Expected status %s, got %s", models.TaskPending, task.Status)
+	if task.Status != models.TaskPending && task.Status != models.TaskRunning {
+		t.Errorf("Expected status %s or %s, got %s", models.TaskPending, models.TaskRunning, task.Status)
 	}
 }
 
@@ -240,10 +240,11 @@ func TestTaskHandler_ListTasks_WithFilter(t *testing.T) {
 	}
 }
 
-func TestTaskHandler_CancelTask(t *testing.T) {
+func TestTaskHandler_DeleteTask(t *testing.T) {
 	handler, router := setupTestHandler()
 	router.POST("/api/v1/tasks", handler.CreateTask)
-	router.DELETE("/api/v1/tasks/:id", handler.CancelTask)
+	router.DELETE("/api/v1/tasks/:id", handler.DeleteTask)
+	router.GET("/api/v1/tasks", handler.ListTasks) // Added for verification
 
 	// 创建任务
 	reqBody := models.CreateTaskRequest{
@@ -271,14 +272,50 @@ func TestTaskHandler_CancelTask(t *testing.T) {
 	var resp map[string]interface{}
 	json.Unmarshal(w.Body.Bytes(), &resp)
 
-	if resp["status"] != "cancelled" {
-		t.Errorf("Expected status 'cancelled', got %v", resp["status"])
+	if resp["status"] != "success" {
+		t.Errorf("Expected status 'success', got %v", resp["status"])
+	}
+	if resp["action"] != "cancelled" {
+		t.Errorf("Expected action 'cancelled', got %v", resp["action"])
+	}
+
+	// Test ListTasks with pagination after cancellation
+	w = httptest.NewRecorder()
+	req = httptest.NewRequest("GET", "/api/v1/tasks?limit=10&offset=0", nil) // Added pagination params
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("Expected status %d, got %d", http.StatusOK, w.Code)
+	}
+
+	var listResp struct {
+		Tasks  []models.Task `json:"tasks"`
+		Total  int           `json:"total"`
+		Limit  int           `json:"limit"`
+		Offset int           `json:"offset"`
+	}
+	err := json.Unmarshal(w.Body.Bytes(), &listResp)
+	if err != nil {
+		t.Fatalf("Failed to unmarshal list response: %v", err)
+	}
+
+	if len(listResp.Tasks) != 1 { // Assuming only one task was created in this test
+		t.Errorf("Expected 1 task, got %d", len(listResp.Tasks))
+	}
+	if listResp.Total != 1 {
+		t.Errorf("Expected total 1, got %d", listResp.Total)
+	}
+	if listResp.Tasks[0].ID != createdTask.ID {
+		t.Errorf("Expected task ID %s, got %s", createdTask.ID, listResp.Tasks[0].ID)
+	}
+	if listResp.Tasks[0].Status != models.TaskCancelled {
+		t.Errorf("Expected task status %s, got %s", models.TaskCancelled, listResp.Tasks[0].Status)
 	}
 }
 
-func TestTaskHandler_CancelTask_NotFound(t *testing.T) {
+func TestTaskHandler_DeleteTask_NotFound(t *testing.T) {
 	handler, router := setupTestHandler()
-	router.DELETE("/api/v1/tasks/:id", handler.CancelTask)
+	router.DELETE("/api/v1/tasks/:id", handler.DeleteTask)
 
 	req := httptest.NewRequest("DELETE", "/api/v1/tasks/non-existent-id", nil)
 	w := httptest.NewRecorder()

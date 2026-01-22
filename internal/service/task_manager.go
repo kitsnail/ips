@@ -121,12 +121,21 @@ func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequ
 
 	// 在后台执行任务
 	go func() {
+		// Create context and store it immediately so the task can be cancelled while pending
+		ctx, cancel := context.WithCancel(context.Background())
+		m.taskContexts.Store(task.ID, cancel)
+
+		// Ensure cleanup happens when the goroutine exits
+		defer m.taskContexts.Delete(task.ID)
+		defer cancel()
+
 		// 等待获取并发槽位
-		if err := m.concurrencySem.Acquire(context.Background(), 1); err != nil {
+		// Use the cancellable context so we can abort if the task is cancelled while waiting
+		if err := m.concurrencySem.Acquire(ctx, 1); err != nil {
 			m.logger.WithFields(logrus.Fields{
 				"taskId": task.ID,
 				"error":  err,
-			}).Error("Failed to acquire concurrency slot")
+			}).Warn("Failed to acquire concurrency slot (task cancelled or timeout)")
 			return
 		}
 		defer m.concurrencySem.Release(1)
@@ -136,10 +145,10 @@ func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequ
 			"maxConcurrency": m.maxConcurrency,
 		}).Info("Task acquired execution slot")
 
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		m.taskContexts.Store(task.ID, cancel)
-		defer m.taskContexts.Delete(task.ID)
+		// Check strictly if context is already cancelled (redundant with Acquire but safe)
+		if ctx.Err() != nil {
+			return
+		}
 
 		if err := m.executeTask(ctx, task); err != nil {
 			m.logger.WithFields(logrus.Fields{
@@ -189,6 +198,11 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 		Percentage:     0,
 	}
 
+	// Check if context is cancelled before starting
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+
 	task.Status = models.TaskRunning
 	now := time.Now()
 	task.StartedAt = &now
@@ -236,6 +250,16 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 
 // markTaskFailed 标记任务失败或触发重试
 func (m *TaskManager) markTaskFailed(ctx context.Context, task *models.Task, err error, startTime time.Time) error {
+	// If the context is cancelled, it means the task was manually cancelled.
+	// We should NOT overwrite the Cancelled status with Failed or Pending.
+	if ctx.Err() != nil {
+		m.logger.WithFields(logrus.Fields{
+			"taskId": task.ID,
+			"error":  err,
+		}).Info("Task context cancelled, skipping failure handling")
+		return ctx.Err()
+	}
+
 	// 检查是否可以重试
 	if task.RetryCount < task.MaxRetries {
 		// 增加重试计数
@@ -346,27 +370,35 @@ func (m *TaskManager) GetTask(ctx context.Context, id string) (*models.Task, err
 }
 
 // ListTasks 列出任务
-func (m *TaskManager) ListTasks(ctx context.Context, filter models.TaskFilter) ([]*models.Task, int, error) {
-	tasks, err := m.repo.ListTasks(ctx)
+func (m *TaskManager) ListTasks(ctx context.Context, offset, limit int) ([]*models.Task, int, error) {
+	tasks, total, err := m.repo.ListTasks(ctx, offset, limit)
 	if err != nil {
 		return nil, 0, err
 	}
-	return tasks, len(tasks), nil
+	return tasks, total, nil
 }
 
-// CancelTask 取消任务
-func (m *TaskManager) CancelTask(ctx context.Context, id string) error {
+// DeleteTask 删除或取消任务
+// 如果任务正在运行，则取消任务
+// 如果任务已结束，则删除任务记录
+func (m *TaskManager) DeleteTask(ctx context.Context, id string) (string, error) {
 	// 获取任务
 	task, err := m.repo.GetTask(ctx, id)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// 检查任务状态
+	// 如果是终止状态，直接删除记录
 	if task.Status == models.TaskCompleted || task.Status == models.TaskFailed || task.Status == models.TaskCancelled {
-		return fmt.Errorf("task already finished with status: %s", task.Status)
+		if err := m.repo.DeleteTask(ctx, id); err != nil {
+			return "", fmt.Errorf("failed to delete task record: %w", err)
+		}
+		m.logger.WithField("taskId", id).Info("Task record deleted")
+		return "deleted", nil
 	}
 
+	// 如果是运行状态，执行取消逻辑
 	// 取消任务的上下文
 	if cancelFunc, ok := m.taskContexts.Load(id); ok {
 		if cancel, ok := cancelFunc.(context.CancelFunc); ok {
@@ -381,7 +413,7 @@ func (m *TaskManager) CancelTask(ctx context.Context, id string) error {
 
 	err = m.repo.UpdateTask(ctx, task)
 	if err != nil {
-		return fmt.Errorf("failed to update task: %w", err)
+		return "", fmt.Errorf("failed to update task status to cancelled: %w", err)
 	}
 
 	// 记录任务取消指标
@@ -401,5 +433,5 @@ func (m *TaskManager) CancelTask(ctx context.Context, id string) error {
 	}
 
 	m.logger.WithField("taskId", id).Info("Task cancelled")
-	return nil
+	return "cancelled", nil
 }

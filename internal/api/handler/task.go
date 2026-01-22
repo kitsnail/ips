@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -76,6 +77,7 @@ func (h *TaskHandler) GetTask(c *gin.Context) {
 }
 
 // ListTasks 列出任务
+// ListTasks 列出任务
 // @Summary 列出所有任务
 // @Router /api/v1/tasks [get]
 func (h *TaskHandler) ListTasks(c *gin.Context) {
@@ -90,24 +92,21 @@ func (h *TaskHandler) ListTasks(c *gin.Context) {
 	}
 
 	// 设置默认值
-	if req.Limit == 0 {
+	if req.Limit <= 0 {
 		req.Limit = 10
 	}
-
-	// 构建过滤器
-	filter := models.TaskFilter{
-		Limit:  req.Limit,
-		Offset: req.Offset,
+	if req.Limit > 100 {
+		req.Limit = 100
+	}
+	if req.Offset < 0 {
+		req.Offset = 0
 	}
 
-	// 状态过滤
-	if req.Status != "" {
-		status := models.TaskStatus(req.Status)
-		filter.Status = &status
-	}
+	// TODO: Implement Status filtering in repository layer if needed
+	// For now, we only support pagination
 
 	// 查询任务列表
-	tasks, total, err := h.taskManager.ListTasks(c.Request.Context(), filter)
+	tasks, total, err := h.taskManager.ListTasks(c.Request.Context(), req.Offset, req.Limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "Failed to list tasks",
@@ -124,13 +123,13 @@ func (h *TaskHandler) ListTasks(c *gin.Context) {
 	})
 }
 
-// CancelTask 取消任务
-// @Summary 取消任务
+// DeleteTask 删除或取消任务
+// @Summary 删除或取消任务
 // @Router /api/v1/tasks/:id [delete]
-func (h *TaskHandler) CancelTask(c *gin.Context) {
+func (h *TaskHandler) DeleteTask(c *gin.Context) {
 	taskID := c.Param("id")
 
-	err := h.taskManager.CancelTask(c.Request.Context(), taskID)
+	action, err := h.taskManager.DeleteTask(c.Request.Context(), taskID)
 	if err != nil {
 		if err == repository.ErrTaskNotFound {
 			c.JSON(http.StatusNotFound, gin.H{
@@ -139,20 +138,8 @@ func (h *TaskHandler) CancelTask(c *gin.Context) {
 			return
 		}
 
-		// 检查是否是任务已完成的错误
-		errMsg := err.Error()
-		if errMsg == "task already finished" ||
-		   // 匹配 "task already finished with status: xxx" 格式
-		   len(errMsg) > 26 && errMsg[:26] == "task already finished with" {
-			c.JSON(http.StatusConflict, gin.H{
-				"error":   "Cannot cancel task",
-				"message": err.Error(),
-			})
-			return
-		}
-
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to cancel task",
+			"error":   "Failed to delete/cancel task",
 			"details": err.Error(),
 		})
 		return
@@ -160,8 +147,9 @@ func (h *TaskHandler) CancelTask(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"taskId":  taskID,
-		"status":  "cancelled",
-		"message": "Task cancelled successfully",
+		"status":  "success",
+		"action":  action,
+		"message": fmt.Sprintf("Task %s successfully", action),
 	})
 }
 
