@@ -16,11 +16,18 @@ import (
 	"github.com/kitsnail/ips/internal/repository"
 	"github.com/kitsnail/ips/internal/service"
 	"github.com/kitsnail/ips/pkg/models"
+	"github.com/kitsnail/ips/pkg/version"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func main() {
+	// Check for version flag
+	if len(os.Args) > 1 && os.Args[1] == "--version" {
+		fmt.Println(version.Info())
+		return
+	}
+
 	// 检查是否是辅助拉取命令
 	if len(os.Args) > 1 && os.Args[1] == "pull" {
 		imagesStr := os.Getenv("IMAGES")
@@ -41,7 +48,7 @@ func main() {
 	})
 	logger.SetLevel(logrus.InfoLevel)
 
-	logger.Info("Starting Image Prewarm Service...")
+	logger.Infof("Starting Image Prewarm Service... %s", version.Info())
 
 	// 1. 初始化K8s客户端
 	namespace := os.Getenv("K8S_NAMESPACE")
