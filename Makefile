@@ -42,7 +42,7 @@ help: ## 显示帮助信息
 build: ## 构建二进制文件 (Linux amd64)
 	@echo "$(GREEN)Building API server $(VERSION) for Linux amd64...$(RESET)"
 	@mkdir -p $(BINARY_DIR)
-	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="$(LDFLAGS)" -o $(BINARY_DIR)/$(BINARY_NAME) ./cmd/apiserver
+	@GOTOOLCHAIN=local CGO_ENABLED=0 GOOS=linux GOARCH=amd64 /usr/local/go/bin/go build -ldflags="$(LDFLAGS)" -o $(BINARY_DIR)/$(BINARY_NAME) ./cmd/apiserver
 
 build_darwin: ## 构建二进制文件 (Darwin arm64)
 	@echo "$(GREEN)Building API server $(VERSION) for Darwin arm64...$(RESET)"

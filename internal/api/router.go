@@ -11,7 +11,7 @@ import (
 )
 
 // SetupRouter 设置路由
-func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, authService *service.AuthService, userRepo repository.UserRepository, libraryRepo repository.LibraryRepository) *gin.Engine {
+func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, authService *service.AuthService, userRepo repository.UserRepository, libraryRepo repository.LibraryRepository, secretRepo repository.SecretRegistryRepository) *gin.Engine {
 	// 设置Gin模式
 	gin.SetMode(gin.ReleaseMode)
 
@@ -44,6 +44,7 @@ func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, authSe
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userRepo)
 	libraryHandler := handler.NewLibraryHandler(libraryRepo)
+	secretHandler := handler.NewSecretHandler(secretRepo)
 
 	// 登录接口 (公开)
 	router.POST("/api/v1/login", authHandler.Login)
@@ -61,6 +62,13 @@ func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, authSe
 		v1.GET("/library", libraryHandler.ListImages)
 		v1.POST("/library", libraryHandler.SaveImage)
 		v1.DELETE("/library/:id", libraryHandler.DeleteImage)
+
+		// 私有仓库认证
+		v1.GET("/secrets", secretHandler.ListSecrets)
+		v1.POST("/secrets", secretHandler.CreateSecret)
+		v1.GET("/secrets/:id", secretHandler.GetSecret)
+		v1.PUT("/secrets/:id", secretHandler.UpdateSecret)
+		v1.DELETE("/secrets/:id", secretHandler.DeleteSecret)
 
 		// 修改密码 (所有登录用户都可调用，Handler 内部做权限校验)
 		v1.PUT("/users/:id", userHandler.UpdateUser)

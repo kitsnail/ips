@@ -37,6 +37,36 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		return
 	}
 
+	// 验证私有仓库凭证：两种方式二选一
+	// 方式1：使用 secretId
+	// 方式2：手动输入 registry/username/password
+	if req.SecretID > 0 {
+		// secretId 方式
+		if req.Registry != "" || req.Username != "" || req.Password != "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Authentication method conflict",
+				"details": "Cannot use both secretId and manual credentials",
+			})
+			return
+		}
+	} else if req.Registry != "" || req.Username != "" || req.Password != "" {
+		// 手动输入方式
+		if req.Registry != "" && (req.Username == "" || req.Password == "") {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Private registry credentials incomplete",
+				"details": "When registry is provided, both username and password are required",
+			})
+			return
+		}
+		if (req.Username != "" || req.Password != "") && req.Registry == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":   "Private registry credentials incomplete",
+				"details": "When username or password is provided, registry is required",
+			})
+			return
+		}
+	}
+
 	// 创建任务
 	task, err := h.taskManager.CreateTask(c.Request.Context(), &req)
 	if err != nil {

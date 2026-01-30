@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: ips-config
-  namespace: ips-system
+  namespace: ips
   labels:
     app: ips
     component: apiserver
@@ -12,20 +12,14 @@ data:
   SERVER_PORT: "8080"
 
   # K8s 命名空间（IPS 将在此命名空间创建 Job）
-  K8S_NAMESPACE: "ips-system"
-
-  # Worker/Puller 镜像 (使用 IPS 自身的镜像以使用 pull 子命令)
-  WORKER_IMAGE: "192.168.3.81/library/ips-apiserver:dev"
-  PULLER_IMAGE: "192.168.3.81/library/ips-apiserver:dev"
-
-  # CRI Socket 路径 (根据集群实际情况配置)
-  CRI_SOCKET_PATH: "/run/containerd/containerd.sock"
+  K8S_NAMESPACE: "ips"
 
   # 日志级别
   LOG_LEVEL: "info"
 
-  # 数据库路径 (持久化存储)
+  # SQLite 数据库路径
   SQLITE_DB_PATH: "/data/ips.db"
 
-  # JWT 密钥 (正式环境请通过 Secret 配置)
-  JWT_SECRET: "ips-default-secret-change-me"
+  # Puller 镜像
+  PULLER_IMAGE: "192.168.3.81/library/ips-apiserver:dev"
+

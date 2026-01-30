@@ -21,7 +21,10 @@ let state = {
     confirmCallback: null,
     library: [],
     libraryPagination: { page: 1, pageSize: 10, total: 0 },
-    selectedLibImages: new Set()
+    selectedLibImages: new Set(),
+    secrets: [],
+    secretPagination: { page: 1, pageSize: 10, total: 0 },
+    selectedSecrets: new Set()
 };
 
 // --- Toast Factory ---
@@ -368,11 +371,34 @@ function renderDetailModal(task) {
         </div>
         
         <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div style="display: grid; grid-template-columns:1fr 1fr; gap: 16px;">
                 <div class="detail-row"><strong>任务 ID:</strong> ${task.taskId}</div>
                  <div class="detail-row"><strong>创建时间:</strong> ${formatTime(task.createdAt)}</div>
                  <div class="detail-row"><strong>重试策略:</strong> ${task.retryStrategy} (最大重试 ${task.maxRetries} 次)</div>
             </div>
+            ${task.secretName ? `
+            <div style="margin-top: 12px; padding: 12px; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px;">
+                <div class="detail-row" style="color: #3730a3;">
+                    <strong style="color: #3730a3;">私有仓库认证:</strong>
+                    <span class="status-badge" style="background: #dbeafe; color: #1e40af;">已启用</span>
+                </div>
+                <div class="detail-row" style="color: #3730a3;">
+                    <strong style="color: #3730a3;">Secret 名称:</strong>
+                    <span style="font-family: monospace; font-size: 13px; color: #3730a3;">${task.secretName}</span>
+                </div>
+                <div style="font-size: 11px; color: #6366f1; margin-top: 4px;">
+                    <svg class="icon" style="width: 12px; height: 12px; color: #6366f1; vertical-align: text-bottom;" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-5v5zM12 16.5a2.5 2.5 0 110-5 2.5 2.5 0 010-5z"/></svg>
+                    临时 Secret 会在任务完成后自动清理
+                </div>
+            </div>
+            ` : ''}
+             <div style="margin-top: 12px;">
+                <strong>镜像列表:</strong>
+                <div style="max-height: 100px; overflow-y: auto; background: #fff; padding: 8px; border:1px solid #e5e7eb; border-radius:4px; margin-top: 4px; font-family: monospace; font-size: 12px;">
+                    ${task.images.join('<br>')}
+                </div>
+            </div>
+        </div>
              <div style="margin-top: 12px;">
                 <strong>镜像列表:</strong>
                 <div style="max-height: 100px; overflow-y: auto; background: #fff; padding: 8px; border: 1px solid #e5e7eb; border-radius: 4px; margin-top: 4px; font-family: monospace; font-size: 12px;">
@@ -409,6 +435,10 @@ function renderFailedNodes(failedNodes) {
 async function createTask(event) {
     event.preventDefault();
     const images = document.getElementById('images').value.trim().split('\n').filter(i => i.trim());
+
+    const enableRegistry = document.getElementById('enableRegistry').checked;
+    const manualMode = document.querySelector('input[name="authMode"][value="manual"]').checked;
+
     const body = {
         images,
         batchSize: parseInt(document.getElementById('batchSize').value),
@@ -420,17 +450,71 @@ async function createTask(event) {
         nodeSelector: document.getElementById('nodeSelector')?.value.trim() ? JSON.parse(document.getElementById('nodeSelector').value) : null
     };
 
+    // 如果启用了私有仓库认证
+    if (enableRegistry) {
+        if (manualMode) {
+            // 手动输入方式
+            const registry = document.getElementById('registry').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!registry || !username || !password) {
+                showToast('请填写完整的镜像仓库认证信息', 'error');
+                return;
+            }
+            body.registry = registry;
+            body.username = username;
+            body.password = password;
+        } else {
+            // 选择已保存的认证
+            const secretId = parseInt(document.getElementById('selectedSecretId').value);
+            if (!secretId) {
+                showToast('请选择仓库认证', 'error');
+                return;
+            }
+            body.secretId = secretId;
+        }
+    }
+
     try {
         const response = await fetchWithAuth(`${API_BASE}/tasks`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body)
         });
-        if (!response.ok) throw new Error('Creation failed');
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || error.details || 'Creation failed');
+        }
         hideCreateTaskModal();
+        showToast('任务创建成功');
         refreshTasks();
     } catch (error) {
-        alert(error.message);
+        showToast(error.message, 'error');
+    }
+}
+
+// Toggle registry fields visibility
+function toggleRegistryFields() {
+    const enableRegistry = document.getElementById('enableRegistry').checked;
+    const registryFields = document.getElementById('registryFields');
+
+    if (enableRegistry) {
+        registryFields.style.display = 'block';
+        // Set default to manual mode if none selected
+        const manualRadio = document.querySelector('input[name="authMode"][value="manual"]');
+        const selectRadio = document.querySelector('input[name="authMode"][value="select"]');
+        if (!manualRadio.checked && !selectRadio.checked) {
+            manualRadio.checked = true;
+        }
+        toggleAuthMode();
+    } else {
+        registryFields.style.display = 'none';
+        // Clear required attributes when disabled to allow form submission
+        document.getElementById('registry').required = false;
+        document.getElementById('username').required = false;
+        document.getElementById('password').required = false;
+        document.getElementById('selectedSecretId').required = false;
     }
 }
 
@@ -592,6 +676,10 @@ function switchTab(tab) {
         document.getElementById('libraryPanel').style.display = 'block';
         document.querySelectorAll('a[onclick="switchTab(\'library\')"]').forEach(e => e.classList.add('active'));
         refreshLibrary();
+    } else if (tab === 'secrets') {
+        document.getElementById('secretsPanel').style.display = 'block';
+        document.querySelectorAll('a[onclick="switchTab(\'secrets\')"]').forEach(e => e.classList.add('active'));
+        refreshSecrets();
     } else if (tab === 'admin') {
         document.getElementById('adminPanel').style.display = 'block';
         document.getElementById('adminTab').classList.add('active');
@@ -600,8 +688,16 @@ function switchTab(tab) {
 }
 
 function showCreateTaskModal() {
+    // Reset form to default state
+    const form = document.getElementById('createTaskForm');
+    if (form) {
+        form.reset();
+        // Ensure registry fields and required attributes are synced
+        toggleRegistryFields();
+    }
     document.getElementById('createModal').classList.add('show');
     refreshQuickLibrary();
+    loadSecretsForDropdown();
 }
 function hideCreateTaskModal() { document.getElementById('createModal').classList.remove('show'); }
 function showCreateUserModal() { document.getElementById('createUserModal').classList.add('show'); }
@@ -869,3 +965,260 @@ function getStatusText(s) {
         'cancelled': '已取消'
     }[s] || s;
 }
+
+// ==================== Secrets Management ====================
+
+async function refreshSecrets() {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/secrets?page=${state.secretPagination.page}&pageSize=${state.secretPagination.pageSize}`);
+        const data = await response.json();
+        state.secrets = data.data || [];
+        state.secretPagination.total = data.total || 0;
+        renderSecrets();
+    } catch (error) {
+        console.error('Failed to load secrets:', error);
+        showToast('加载仓库认证失败', 'error');
+    }
+}
+
+function renderSecrets() {
+    const tbody = document.getElementById('secretListBody');
+    const filtered = state.secrets;
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">暂无仓库认证</td></tr>';
+        document.getElementById('secretPageStart').textContent = '0';
+        document.getElementById('secretPageEnd').textContent = '0';
+        document.getElementById('secretTotalItems').textContent = '0';
+        return;
+    }
+
+    const offset = (state.secretPagination.page - 1) * state.secretPagination.pageSize;
+    const start = offset + 1;
+    const end = Math.min(start + state.secretPagination.pageSize - 1, state.secretPagination.total);
+
+    document.getElementById('secretPageStart').textContent = start;
+    document.getElementById('secretPageEnd').textContent = end;
+    document.getElementById('secretTotalItems').textContent = state.secretPagination.total;
+
+    tbody.innerHTML = filtered.map(secret => `
+        <tr>
+            <td class="col-checkbox">
+                <input type="checkbox"
+                    onchange="toggleSecretSelection(${secret.id})"
+                    ${state.selectedSecrets.has(secret.id) ? 'checked' : ''}>
+            </td>
+            <td style="font-weight: 500;">${secret.name}</td>
+            <td style="font-family: monospace;">${secret.registry}</td>
+            <td>${secret.username}</td>
+            <td style="color: #64748b; font-size: 13px;">${formatTime(secret.createdAt)}</td>
+            <td>
+                <button class="btn btn-sm btn-secondary" onclick="editSecret(${secret.id})">编辑</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteSecret(${secret.id})">删除</button>
+            </td>
+        </tr>
+    `).join('');
+
+    updateSecretPaginationButtons();
+    updateSecretBatchDeleteButton();
+}
+
+function toggleSecretSelection(id) {
+    if (state.selectedSecrets.has(id)) {
+        state.selectedSecrets.delete(id);
+    } else {
+        state.selectedSecrets.add(id);
+    }
+    renderSecrets();
+}
+
+function toggleSecretSelectAll() {
+    const selectAllCheckbox = document.getElementById('secretSelectAll');
+    if (selectAllCheckbox.checked) {
+        state.secrets.forEach(s => state.selectedSecrets.add(s.id));
+    } else {
+        state.selectedSecrets.clear();
+    }
+    renderSecrets();
+}
+
+function updateSecretBatchDeleteButton() {
+    const btn = document.getElementById('secretBatchDeleteBtn');
+    if (btn) {
+        btn.style.display = state.selectedSecrets.size > 0 ? 'inline-flex' : 'none';
+    }
+}
+
+function executeSecretBatchDelete() {
+    if (state.selectedSecrets.size === 0) return;
+
+    showConfirm('批量删除认证', `确定要删除选中的 ${state.selectedSecrets.size} 个仓库认证吗?`, async () => {
+        try {
+            await Promise.all([...state.selectedSecrets].map(id =>
+                fetchWithAuth(`${API_BASE}/secrets/${id}`, { method: 'DELETE' })
+            ));
+            showToast('批量删除成功');
+            state.selectedSecrets.clear();
+            refreshSecrets();
+        } catch (error) {
+            showToast('批量删除失败: ' + error.message, 'error');
+        }
+    });
+}
+
+function changeSecretPageSize() {
+    state.secretPagination.pageSize = parseInt(document.getElementById('secretPageSizeSelect').value);
+    state.secretPagination.page = 1;
+    refreshSecrets();
+}
+
+function secretPrevPage() {
+    if (state.secretPagination.page > 1) {
+        state.secretPagination.page--;
+        refreshSecrets();
+    }
+}
+
+function secretNextPage() {
+    const maxPage = Math.ceil(state.secretPagination.total / state.secretPagination.pageSize);
+    if (state.secretPagination.page < maxPage) {
+        state.secretPagination.page++;
+        refreshSecrets();
+    }
+}
+
+function updateSecretPaginationButtons() {
+    const maxPage = Math.ceil(state.secretPagination.total / state.secretPagination.pageSize);
+    document.getElementById('secretPrevBtn').disabled = state.secretPagination.page <= 1;
+    document.getElementById('secretNextBtn').disabled = state.secretPagination.page >= maxPage;
+    document.getElementById('secretCurrentPageNum').textContent = state.secretPagination.page;
+}
+
+function showCreateSecretModal() {
+    document.getElementById('secretModalTitle').textContent = '添加仓库认证';
+    document.getElementById('secretId').value = '';
+    document.getElementById('secretName').value = '';
+    document.getElementById('secretRegistry').value = '';
+    document.getElementById('secretUsername').value = '';
+    document.getElementById('secretPassword').value = '';
+    document.getElementById('secretPasswordHint').style.display = 'none';
+    document.getElementById('createSecretModal').classList.add('show');
+}
+
+function hideCreateSecretModal() {
+    document.getElementById('createSecretModal').classList.remove('show');
+}
+
+function editSecret(id) {
+    const secret = state.secrets.find(s => s.id === id);
+    if (!secret) return;
+
+    document.getElementById('secretModalTitle').textContent = '编辑仓库认证';
+    document.getElementById('secretId').value = secret.id;
+    document.getElementById('secretName').value = secret.name;
+    document.getElementById('secretRegistry').value = secret.registry;
+    document.getElementById('secretUsername').value = secret.username;
+    document.getElementById('secretPassword').value = '';
+    document.getElementById('secretPasswordHint').style.display = 'block';
+    document.getElementById('createSecretModal').classList.add('show');
+}
+
+async function saveSecret(e) {
+    e.preventDefault();
+    const id = document.getElementById('secretId').value;
+    const isEdit = id !== '';
+
+    const req = {
+        name: document.getElementById('secretName').value,
+        registry: document.getElementById('secretRegistry').value,
+        username: document.getElementById('secretUsername').value,
+        password: document.getElementById('secretPassword').value
+    };
+
+    if (!req.name || !req.registry || !req.username || (!isEdit && !req.password)) {
+        showToast('请填写所有必填字段', 'error');
+        return;
+    }
+
+    try {
+        if (isEdit) {
+            if (req.password) {
+                await fetchWithAuth(`${API_BASE}/secrets/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(req)
+                });
+            } else {
+                await fetchWithAuth(`${API_BASE}/secrets/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: req.name, registry: req.registry, username: req.username })
+                });
+            }
+            showToast('认证已更新');
+        } else {
+            await fetchWithAuth(`${API_BASE}/secrets`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(req)
+            });
+            showToast('认证已创建');
+        }
+
+        hideCreateSecretModal();
+        refreshSecrets();
+        loadSecretsForDropdown();
+    } catch (error) {
+        showToast('保存失败: ' + error.message, 'error');
+    }
+}
+
+async function deleteSecret(id) {
+    showConfirm('删除认证', '确定要删除此仓库认证吗?', async () => {
+        try {
+            await fetchWithAuth(`${API_BASE}/secrets/${id}`, { method: 'DELETE' });
+            showToast('认证已删除');
+            refreshSecrets();
+            loadSecretsForDropdown();
+        } catch (error) {
+            showToast('删除失败: ' + error.message, 'error');
+        }
+    });
+}
+
+async function loadSecretsForDropdown() {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/secrets?pageSize=100`);
+        const data = await response.json();
+        const secrets = data.data || [];
+        const select = document.getElementById('selectedSecretId');
+
+        select.innerHTML = '<option value="">-- 请选择认证 --</option>';
+        secrets.forEach(s => {
+            select.innerHTML += `<option value="${s.id}">${s.name} (${s.registry})</option>`;
+        });
+    } catch (error) {
+        console.error('Failed to load secrets for dropdown:', error);
+    }
+}
+
+function toggleAuthMode() {
+    const manualMode = document.querySelector('input[name="authMode"][value="manual"]').checked;
+    document.getElementById('manualAuthFields').style.display = manualMode ? 'block' : 'none';
+    document.getElementById('selectAuthFields').style.display = manualMode ? 'none' : 'block';
+
+    if (manualMode) {
+        document.getElementById('registry').required = true;
+        document.getElementById('username').required = true;
+        document.getElementById('password').required = true;
+        document.getElementById('selectedSecretId').required = false;
+    } else {
+        document.getElementById('registry').required = false;
+        document.getElementById('username').required = false;
+        document.getElementById('password').required = false;
+        document.getElementById('selectedSecretId').required = true;
+    }
+}
+
+// Patch createTask function to support secretId
+const originalCreateTask = createTask;

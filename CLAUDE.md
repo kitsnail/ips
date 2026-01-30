@@ -41,21 +41,23 @@ The service follows a layered architecture:
    - **JobCreator**: Creates Jobs with initContainers to pull target images
    - **Node operations**: List and filter nodes
 
-5. **Models** (`pkg/models/`)
-   - Task: Core data model with status, progress, priority, retry config, webhook URL
-   - Progress: Tracks node completion percentage and batch progress
-   - Request/Response DTOs
+ 5. **Models** (`pkg/models/`)
+    - Task: Core data model with status, progress, priority, retry config, webhook URL, secretName
+    - Progress: Tracks node completion percentage and batch progress
+    - Request/Response DTOs
 
 ### Task Execution Flow
 
 1. API receives CreateTask request → TaskManager validates and saves task with priority
-2. Task queued in priority queue (1-10, higher = more urgent)
-3. TaskManager acquires concurrency slot (semaphore-based)
-4. NodeFilter gets matching nodes → BatchScheduler splits into batches
-5. For each batch: JobCreator creates Kubernetes Jobs with initContainers pulling images
-6. StatusTracker watches Job events and updates task progress
-7. On failure: retry logic kicks in (linear/exponential backoff) if retries remain
-8. On completion/failure/cancellation: WebhookNotifier sends notification if configured
+2. **Private registry support**: If registry/username/password provided, JobCreator creates temporary Secret with `.dockerconfigjson`
+3. Task queued in priority queue (1-10, higher = more urgent)
+4. TaskManager acquires concurrency slot (semaphore-based)
+5. NodeFilter gets matching nodes → BatchScheduler splits into batches
+6. For each batch: JobCreator creates Kubernetes Jobs with imagePullSecrets and initContainers pulling images
+7. StatusTracker watches Job events and updates task progress
+8. On failure: retry logic kicks in (linear/exponential backoff) if retries remain
+9. On completion/failure/cancellation: WebhookNotifier sends notification if configured
+10. **Cleanup**: Temporary Secret is deleted automatically after task completion
 
 ### Kubernetes Job Design
 
@@ -111,6 +113,7 @@ make k8s-delete          # Remove all resources
 - List nodes
 - Create/watch/delete Jobs in the configured namespace
 - Get Job events
+- Create/delete Secrets（用于私有镜像仓库认证）
 
 Deployment config is in `deploy/` with namespace, RBAC, ConfigMap, Deployment, Service, and HPA.
 

@@ -1,11 +1,16 @@
+---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: ips-data
-  namespace: ips-system
+  namespace: ips
+  labels:
+    app: ips
+    component: apiserver
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 1Gi
+      storage: 10Gi
+  storageClassName: nfs-csi-0

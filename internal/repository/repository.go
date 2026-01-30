@@ -63,3 +63,21 @@ type LibraryRepository interface {
 	// DeleteImage 从库中删除镜像
 	DeleteImage(ctx context.Context, id int64) error
 }
+
+// SecretRegistryRepository 私有仓库认证存储接口
+type SecretRegistryRepository interface {
+	// CreateSecret 创建仓库认证
+	CreateSecret(ctx context.Context, secret *models.RegistrySecret) error
+	// GetSecret 获取仓库认证
+	GetSecret(ctx context.Context, id int64) (*models.RegistrySecret, error)
+	// GetSecretByName 按名称获取仓库认证
+	GetSecretByName(ctx context.Context, name string) (*models.RegistrySecret, error)
+	// ListSecrets 列出所有仓库认证
+	ListSecrets(ctx context.Context, offset, limit int) ([]*models.SecretListItem, int, error)
+	// UpdateSecret 更新仓库认证
+	UpdateSecret(ctx context.Context, secret *models.RegistrySecret) error
+	// DeleteSecret 删除仓库认证
+	DeleteSecret(ctx context.Context, id int64) error
+	// GetSecretCredentials 获取认证凭据（包含密码）
+	GetSecretCredentials(ctx context.Context, id int64) (*models.RegistrySecret, error)
+}

@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ips-apiserver
-  namespace: ips-system
+  namespace: ips
   labels:
     app: ips
     component: apiserver
@@ -24,6 +24,10 @@ spec:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: ips-data
       containers:
         - name: apiserver
           image: 192.168.3.81/library/ips-apiserver:dev
@@ -35,6 +39,9 @@ spec:
           envFrom:
             - configMapRef:
                 name: ips-config
+          volumeMounts:
+            - name: data
+              mountPath: /data
           resources:
             requests:
               cpu: 500m
@@ -66,22 +73,3 @@ spec:
             capabilities:
               drop:
                 - ALL
-          volumeMounts:
-            - name: ips-data
-              mountPath: /data
-      volumes:
-        - name: ips-data
-          persistentVolumeClaim:
-            claimName: ips-data
-      # 调度策略：留在管理节点（根据你之前的配置）
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-              - matchExpressions:
-                  - key: node-role.kubernetes.io/control-plane
-                    operator: Exists
-      tolerations:
-        - key: node-role.kubernetes.io/control-plane
-          operator: Exists
-          effect: NoSchedule

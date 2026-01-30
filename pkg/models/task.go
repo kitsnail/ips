@@ -28,6 +28,11 @@ type Task struct {
 	RetryStrategy string                    `json:"retryStrategy"`        // 重试策略: "linear" 或 "exponential"
 	RetryDelay    int                       `json:"retryDelay,omitempty"` // 重试延迟（秒）
 	WebhookURL    string                    `json:"webhookUrl,omitempty"` // Webhook 通知 URL
+	SecretName    string                    `json:"secretName,omitempty"` // 用于私有仓库认证的 Secret 名称（临时值）
+	SecretID      int64                     `json:"secretId,omitempty"`   // 已保存的 secret ID（优先级高于手动凭证）
+	Registry      string                    `json:"registry,omitempty"`   // 镜像仓库地址（手动输入）
+	Username      string                    `json:"username,omitempty"`   // 用户名（手动输入）
+	Password      string                    `json:"-"`                    // 密码（手动输入，不返回）
 	CreatedAt     time.Time                 `json:"createdAt"`
 	StartedAt     *time.Time                `json:"startedAt,omitempty"`
 	FinishedAt    *time.Time                `json:"finishedAt,omitempty"`

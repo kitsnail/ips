@@ -72,17 +72,13 @@ kubectl get pods -n ips-system
 # 1. 编译二进制文件
 make build
 
-# 2. 运行服务 (默认端口 8080)
-make run
-```
 
 服务启动后，访问：
-- **Web UI**: [http://localhost:8080/](http://localhost:8080/)
+- **Web UI**: [http://localhost:8080/](http://localhost:8080/) 
+# 默认用户名 admin，密码 admin123
 - **API Health**: [http://localhost:8080/health](http://localhost:8080/health)
 
 ### 方式三：Docker 运行
-
-```bash
 docker run -d \
   --name ips-apiserver \
   -p 8080:8080 \

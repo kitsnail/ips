@@ -29,6 +29,7 @@ func NewBatchScheduler(jobCreator *k8s.JobCreator, logger *logrus.Logger) *Batch
 // nodes: 目标节点列表
 // images: 要预热的镜像列表
 // batchSize: 每批次的节点数
+// secretName: 可选的包含凭据的 Secret 名称
 // onBatchComplete: 每批次完成后的回调函数（批次号, 成功数, 失败数）
 func (s *BatchScheduler) ExecuteBatches(
 	ctx context.Context,
@@ -36,6 +37,7 @@ func (s *BatchScheduler) ExecuteBatches(
 	nodes []string,
 	images []string,
 	batchSize int,
+	secretName string,
 	onBatchComplete func(batchNum, succeeded, failed int),
 ) error {
 	// 分批
@@ -62,7 +64,7 @@ func (s *BatchScheduler) ExecuteBatches(
 		batchStartTime := time.Now()
 
 		// 为批次中的每个节点创建Job
-		succeeded, failed := s.executeBatch(ctx, taskID, batch, images)
+		succeeded, failed := s.executeBatch(ctx, taskID, batch, images, secretName)
 
 		// 记录批次执行耗时
 		batchDuration := time.Since(batchStartTime).Seconds()
@@ -94,10 +96,10 @@ func (s *BatchScheduler) ExecuteBatches(
 }
 
 // executeBatch 执行单个批次
-func (s *BatchScheduler) executeBatch(ctx context.Context, taskID string, nodes []string, images []string) (succeeded, failed int) {
+func (s *BatchScheduler) executeBatch(ctx context.Context, taskID string, nodes []string, images []string, secretName string) (succeeded, failed int) {
 	// 为批次中的每个节点创建Job
 	for _, nodeName := range nodes {
-		err := s.jobCreator.CreateJob(ctx, taskID, nodeName, images)
+		err := s.jobCreator.CreateJob(ctx, taskID, nodeName, images, secretName)
 		if err != nil {
 			s.logger.WithFields(logrus.Fields{
 				"taskId":   taskID,

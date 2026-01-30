@@ -3,14 +3,14 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ips-apiserver
-  namespace: ips-system
+  namespace: ips
   labels:
     app: ips
     component: apiserver
   annotations:
-    # MetalLB 注解（可选）
+    # MetalLB annotations (optional)
     # metallb.universe.tf/address-pool: default
-    # metallb.universe.tf/loadBalancerIPs: 192.168.3.106
+    metallb.universe.tf/loadBalancerIPs: 192.168.3.107
 spec:
   type: LoadBalancer
   selector:
@@ -21,11 +21,11 @@ spec:
       port: 8080
       targetPort: http
       protocol: TCP
-  # 会话亲和性：确保来自同一客户端的请求路由到同一个 Pod
-  # 这对于使用内存存储的多副本部署很重要
+  # Session affinity: ensure requests from same client route to same pod
+  # This is important for multi-replica deployments using in-memory storage
   sessionAffinity: ClientIP
   sessionAffinityConfig:
     clientIP:
-      timeoutSeconds: 10800  # 3 小时
-  # 可选：指定外部流量策略
+      timeoutSeconds: 10800 # 3 hours
+  # Optional: specify external traffic policy
   externalTrafficPolicy: Cluster

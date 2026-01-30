@@ -13,9 +13,17 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
 // TaskManager 任务管理器
 type TaskManager struct {
 	repo            repository.TaskRepository
+	secretRepo      repository.SecretRegistryRepository
 	nodeFilter      *NodeFilter
 	batchScheduler  *BatchScheduler
 	statusTracker   *StatusTracker
@@ -31,6 +39,7 @@ type TaskManager struct {
 // NewTaskManager 创建任务管理器
 func NewTaskManager(
 	repo repository.TaskRepository,
+	secretRepo repository.SecretRegistryRepository,
 	nodeFilter *NodeFilter,
 	batchScheduler *BatchScheduler,
 	statusTracker *StatusTracker,
@@ -47,6 +56,7 @@ func NewTaskManager(
 
 	return &TaskManager{
 		repo:            repo,
+		secretRepo:      secretRepo,
 		nodeFilter:      nodeFilter,
 		batchScheduler:  batchScheduler,
 		statusTracker:   statusTracker,
@@ -97,6 +107,10 @@ func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequ
 		RetryStrategy: retryStrategy,
 		RetryDelay:    retryDelay,
 		WebhookURL:    req.WebhookURL,
+		Registry:      req.Registry,
+		Username:      req.Username,
+		Password:      req.Password,
+		SecretID:      req.SecretID,
 		CreatedAt:     time.Now(),
 	}
 
@@ -128,6 +142,89 @@ func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequ
 		// Ensure cleanup happens when the goroutine exits
 		defer m.taskContexts.Delete(task.ID)
 		defer cancel()
+
+		// 如果提供了私有仓库凭证，创建 K8s Secret 存储凭据
+		// 使用 Secret + secretKeyRef 方式注入环境变量，避免明文暴露密码
+		var secretName string
+		if req.Registry != "" && req.Username != "" && req.Password != "" {
+			task.Username = req.Username
+			task.Password = req.Password
+			createdSecretName, err := m.batchScheduler.jobCreator.CreateCredsSecret(ctx, task.ID, req.Username, req.Password)
+			if err != nil {
+				m.logger.WithFields(logrus.Fields{
+					"taskId":   task.ID,
+					"registry": req.Registry,
+					"error":    err,
+				}).Error("Failed to create credentials secret")
+				_ = m.markTaskFailed(ctx, task, fmt.Errorf("failed to create credentials secret: %w", err), time.Now())
+				return
+			}
+			secretName = createdSecretName
+			task.SecretName = secretName
+			m.logger.WithFields(logrus.Fields{
+				"taskId":     task.ID,
+				"secretName": secretName,
+				"registry":   req.Registry,
+			}).Info("Created credentials secret for private registry authentication (manual credentials)")
+		} else if req.SecretID > 0 {
+			secretCreds, err := m.secretRepo.GetSecretCredentials(ctx, req.SecretID)
+			if err != nil {
+				m.logger.WithFields(logrus.Fields{
+					"taskId":   task.ID,
+					"secretId": req.SecretID,
+				}).Error("Failed to get secret credentials from database")
+				_ = m.markTaskFailed(ctx, task, fmt.Errorf("failed to get secret credentials: %w", err), time.Now())
+				return
+			}
+
+			m.logger.WithFields(logrus.Fields{
+				"taskId":         task.ID,
+				"secretId":       req.SecretID,
+				"registry":       secretCreds.Registry,
+				"passwordLen":    len(secretCreds.Password),
+				"passwordPrefix": secretCreds.Password[:min(len(secretCreds.Password), 5)],
+			}).Info("Fetched saved credentials for private registry authentication")
+
+			task.Username = secretCreds.Username
+			task.Password = secretCreds.Password
+			createdSecretName, err := m.batchScheduler.jobCreator.CreateCredsSecret(ctx, task.ID, secretCreds.Username, secretCreds.Password)
+			if err != nil {
+				m.logger.WithFields(logrus.Fields{
+					"taskId":   task.ID,
+					"secretId": req.SecretID,
+					"registry": secretCreds.Registry,
+					"error":    err,
+				}).Error("Failed to create credentials secret")
+				_ = m.markTaskFailed(ctx, task, fmt.Errorf("failed to create credentials secret: %w", err), time.Now())
+				return
+			}
+			secretName = createdSecretName
+			task.SecretName = secretName
+			m.logger.WithFields(logrus.Fields{
+				"taskId":     task.ID,
+				"secretName": secretName,
+				"secretId":   req.SecretID,
+				"registry":   secretCreds.Registry,
+			}).Info("Created credentials secret for private registry authentication (from saved credentials)")
+		}
+
+		// 如果创建了 Secret，在任务结束时清理
+		if secretName != "" {
+			defer func() {
+				if err := m.batchScheduler.jobCreator.DeleteSecret(context.Background(), secretName); err != nil {
+					m.logger.WithFields(logrus.Fields{
+						"taskId":     task.ID,
+						"secretName": secretName,
+						"error":      err,
+					}).Error("Failed to delete credentials secret during cleanup")
+				} else {
+					m.logger.WithFields(logrus.Fields{
+						"taskId":     task.ID,
+						"secretName": secretName,
+					}).Info("Deleted credentials secret during cleanup")
+				}
+			}()
+		}
 
 		// 等待获取并发槽位
 		// Use the cancellable context so we can abort if the task is cancelled while waiting
@@ -221,6 +318,7 @@ func (m *TaskManager) executeTask(ctx context.Context, task *models.Task) error 
 		nodes,
 		task.Images,
 		task.BatchSize,
+		task.SecretName, // 传递 Secret 名称，Job 会通过 secretKeyRef 读取凭据
 		func(batchNum, succeeded, failed int) {
 			m.logger.WithFields(logrus.Fields{
 				"taskId":    task.ID,

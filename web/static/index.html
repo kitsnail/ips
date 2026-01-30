@@ -254,6 +254,7 @@
             <nav class="nav-tabs">
                 <a class="nav-link active" onclick="switchTab('tasks')">任务管理</a>
                 <a class="nav-link" onclick="switchTab('library')">镜像库</a>
+                <a class="nav-link" onclick="switchTab('secrets')">仓库认证</a>
                 <a class="nav-link" id="adminTab" onclick="switchTab('admin')" style="display: none;">系统设置</a>
             </nav>
             <div id="userInfo">
@@ -930,170 +931,339 @@
                 </div>
             </div>
         </div>
-    </div>
-    <!-- 创建任务模态框 -->
-    <div id="createModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">创建镜像预热任务</div>
-            <div class="modal-body">
-                <form id="createTaskForm" onsubmit="createTask(event)" style="height: 100%;">
-                    <div class="create-grid">
-                        <div class="config-pane">
-                            <div class="form-group"><label class="form-label">批次大小 *</label><input type="number"
-                                    class="form-input" id="batchSize" value="10" min="1" max="100" required></div>
-                            <div class="form-group"><label class="form-label">优先级 (1-10，默认5)</label><input type="number"
-                                    class="form-input" id="priority" value="5" min="1" max="10"></div>
-                            <div class="form-group"><label class="form-label">最大重试次数 (0-5，默认0)</label><input
-                                    type="number" class="form-input" id="maxRetries" value="0" min="0" max="5">
+
+        <!-- 仓库认证面板 -->
+        <div id="secretsPanel" class="tab-panel" style="display: none;">
+            <div class="action-bar">
+                <button class="btn btn-primary" onclick="showCreateSecretModal()">
+                    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                    </svg>
+                    添加认证
+                </button>
+                <button id="secretBatchDeleteBtn" class="btn btn-danger" onclick="executeSecretBatchDelete()"
+                    style="display: none;">
+                    <svg class="icon" viewBox="0 0 24 24">
+                        <path
+                            d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+                    </svg>
+                    批量删除
+                </button>
+                <div style="margin-left: auto; color: #64748b; font-size: 14px; font-weight: 500;">私有仓库认证管理</div>
+            </div>
+
+            <div class="card" style="padding: 0;">
+                <div class="table-container">
+                    <table class="data-grid">
+                        <thead>
+                            <tr>
+                                <th class="col-checkbox"><input type="checkbox" id="secretSelectAll"
+                                        onchange="toggleSecretSelectAll()"></th>
+                                <th>名称</th>
+                                <th>镜像仓库地址</th>
+                                <th>用户名</th>
+                                <th>创建时间</th>
+                                <th style="width: 120px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="secretListBody">
+                            <!-- 认证数据动态加载 -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="pagination-footer">
+                    <div class="pagination-info">
+                        显示 <span id="secretPageStart">0</span> - <span id="secretPageEnd">0</span> 共 <span
+                            id="secretTotalItems">0</span> 项
+                    </div>
+                    <div class="pagination-controls">
+                        <span style="font-size: 13px; color: #64748b;">每页</span>
+                        <select id="secretPageSizeSelect" class="form-input" style="width: auto; padding: 4px 8px;"
+                            onchange="changeSecretPageSize()">
+                            <option value="10">10</option>
+                            <option value="20">20</option>
+                            <option value="50">50</option>
+                        </select>
+                        <button id="secretPrevBtn" class="btn btn-secondary btn-sm" onclick="secretPrevPage()"
+                            disabled>上一页</button>
+                        <span style="font-size: 13px; color: #111827;">第 <span id="secretCurrentPageNum">1</span>
+                            页</span>
+                        <button id="secretNextBtn" class="btn btn-secondary btn-sm"
+                            onclick="secretNextPage()">下一页</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- 创建任务模态框 -->
+        <div id="createModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">创建镜像预热任务</div>
+                <div class="modal-body">
+                    <form id="createTaskForm" onsubmit="createTask(event)" style="height: 100%;">
+                        <div class="create-grid">
+                            <div class="config-pane">
+                                <div class="form-group"><label class="form-label">批次大小 *</label><input type="number"
+                                        class="form-input" id="batchSize" value="10" min="1" max="100" required></div>
+                                <div class="form-group"><label class="form-label">优先级 (1-10，默认5)</label><input
+                                        type="number" class="form-input" id="priority" value="5" min="1" max="10"></div>
+                                <div class="form-group"><label class="form-label">最大重试次数 (0-5，默认0)</label><input
+                                        type="number" class="form-input" id="maxRetries" value="0" min="0" max="5">
+                                </div>
+                                <div class="form-group"><label class="form-label">重试策略</label><select class="form-input"
+                                        id="retryStrategy">
+                                        <option value="linear">线性</option>
+                                        <option value="exponential">指数退避</option>
+                                    </select></div>
+                                <div class="form-group"><label class="form-label">重试延迟(秒，默认30)</label><input
+                                        type="number" class="form-input" id="retryDelay" value="30" min="1" max="300">
+                                </div>
+
+                                <!-- 私有仓库认证 -->
+                                <div style="border-top: 1px solid #e5e7eb; margin-top: 20px; padding-top: 16px;">
+                                    <div
+                                        style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                                        <label class="form-label" style="margin-bottom: 0;">私有镜像仓库认证</label>
+                                        <label
+                                            style="font-size: 13px; color: #64748b; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                            <input type="checkbox" id="enableRegistry" onchange="toggleRegistryFields()"
+                                                style="width: 16px; height: 16px;">
+                                            启用
+                                        </label>
+                                    </div>
+                                    <div id="registryFields" style="display: none;">
+                                        <div class="form-group" style="margin-bottom: 12px;">
+                                            <label class="form-label"
+                                                style="font-size: 13px; color: #64748b;">认证方式</label>
+                                            <div style="display: flex; gap: 16px; margin-top: 6px;">
+                                                <label
+                                                    style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px;">
+                                                    <input type="radio" name="authMode" value="manual"
+                                                        onchange="toggleAuthMode()" checked
+                                                        style="width: 16px; height: 16px;">
+                                                    手动输入
+                                                </label>
+                                                <label
+                                                    style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px;">
+                                                    <input type="radio" name="authMode" value="select"
+                                                        onchange="toggleAuthMode()" style="width: 16px; height: 16px;">
+                                                    选择已保存的认证
+                                                </label>
+                                            </div>
+                                        </div>
+                                        <div id="manualAuthFields">
+                                            <div class="form-group">
+                                                <label class="form-label" style="color: #3b82f6;">镜像仓库地址 *</label>
+                                                <input type="text" class="form-input" id="registry"
+                                                    placeholder="harbor.example.com" style="font-family: monospace;">
+                                                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">如:
+                                                    harbor.example.com 或 123456.dkr.ecr.us-west-2.amazonaws.com</div>
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="form-label" style="color: #3b82f6;">用户名 *</label>
+                                                <input type="text" class="form-input" id="username"
+                                                    placeholder="your-username">
+                                            </div>
+                                            <div class="form-group">
+                                                <label class="form-label" style="color: #3b82f6;">密码 *</label>
+                                                <input type="password" class="form-input" id="password"
+                                                    placeholder="your-password">
+                                                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                                                    密码仅在任务创建时使用，不会保存</div>
+                                            </div>
+                                        </div>
+                                        <div id="selectAuthFields" style="display: none;">
+                                            <div class="form-group">
+                                                <label class="form-label" style="color: #3b82f6;">选择认证 *</label>
+                                                <select class="form-input" id="selectedSecretId">
+                                                    <option value="">-- 请选择认证 --</option>
+                                                </select>
+                                                <div style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                                                    选择已保存的仓库认证，密码已安全存储</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="form-group"><label class="form-label">重试策略</label><select class="form-input"
-                                    id="retryStrategy">
-                                    <option value="linear">线性</option>
-                                    <option value="exponential">指数退避</option>
-                                </select></div>
-                            <div class="form-group"><label class="form-label">重试延迟(秒，默认30)</label><input type="number"
-                                    class="form-input" id="retryDelay" value="30" min="1" max="300">
+                            <div class="editor-pane"><label class="form-label">镜像列表 * (每行一个镜像)</label><textarea
+                                    class="form-input editor-input" id="images"
+                                    placeholder="docker.io/library/nginx:latest&#10;registry.hub.docker.com/library/redis:7"
+                                    required></textarea></div>
+                            <div class="library-picker-pane">
+                                <label class="form-label">从镜像库选择</label>
+                                <div id="quickLibraryList"
+                                    style="flex: 1; overflow-y: auto; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px;">
+                                    <!-- 快捷选择列表 -->
+                                </div>
                             </div>
                         </div>
-                        <div class="editor-pane"><label class="form-label">镜像列表 * (每行一个镜像)</label><textarea
-                                class="form-input editor-input" id="images"
-                                placeholder="docker.io/library/nginx:latest&#10;registry.hub.docker.com/library/redis:7"
-                                required></textarea></div>
-                        <div class="library-picker-pane">
-                            <label class="form-label">从镜像库选择</label>
-                            <div id="quickLibraryList"
-                                style="flex: 1; overflow-y: auto; background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px;">
-                                <!-- 快捷选择列表 -->
-                            </div>
+                    </form>
+                </div>
+                <div class="form-actions"><button type="button" class="btn btn-secondary"
+                        onclick="hideCreateTaskModal()">取消</button><button type="button" class="btn btn-primary"
+                        onclick="document.getElementById('createTaskForm').requestSubmit()">创建任务并开始</button></div>
+            </div>
+        </div>
+        <!-- 创建/编辑仓库认证模态框 -->
+        <div id="createSecretModal" class="modal">
+            <div class="modal-content" style="height: auto; width: 500px; max-width: 90vw;">
+                <div class="modal-header">
+                    <span id="secretModalTitle">添加仓库认证</span>
+                </div>
+                <div class="modal-body">
+                    <form id="createSecretForm" onsubmit="saveSecret(event)">
+                        <input type="hidden" id="secretId">
+                        <div class="form-group">
+                            <label class="form-label">认证名称 *</label>
+                            <input type="text" id="secretName" class="form-input" required placeholder="例如：Harbor私有仓库">
                         </div>
-                    </div>
-                </form>
-            </div>
-            <div class="form-actions"><button type="button" class="btn btn-secondary"
-                    onclick="hideCreateTaskModal()">取消</button><button type="button" class="btn btn-primary"
-                    onclick="document.getElementById('createTaskForm').requestSubmit()">创建任务并开始</button></div>
-        </div>
-    </div>
-    <!-- 任务详情模态框 -->
-    <div id="detailModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header"><span>任务详情仪表盘</span></div>
-            <div class="modal-body" id="taskDetail">
-                <div class="loading">加载详情中...</div>
-            </div>
-            <div class="form-actions"><button type="button" class="btn btn-secondary"
-                    onclick="hideDetailModal()">关闭</button><button type="button" class="btn btn-primary"
-                    id="cancelTaskBtn" onclick="cancelCurrentTask()" style="display:none;">取消任务</button></div>
-        </div>
-    </div>
-    <!-- 添加镜像库镜像模态框 -->
-    <div id="addLibraryModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">添加常用镜像</div>
-            <div class="modal-body">
-                <form id="addLibraryForm" onsubmit="addLibraryImage(event)">
-                    <div class="form-group">
-                        <label class="form-label">镜像列表 (每行一个镜像)</label>
-                        <textarea id="libImages" class="form-input" style="height: 200px; font-family: monospace;"
-                            placeholder="docker.io/library/nginx:latest&#10;cr01.home.lan/library/n8n:v0.1.1"
-                            required></textarea>
-                        <div style="font-size: 11px; color: #64748b; margin-top: 4px;">* 显示名将根据镜像路径自动生成</div>
-                    </div>
-                </form>
-            </div>
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="hideAddLibraryModal()">取消</button>
-                <button type="button" class="btn btn-primary"
-                    onclick="document.getElementById('addLibraryForm').requestSubmit()">保存</button>
+                        <div class="form-group">
+                            <label class="form-label">镜像仓库地址 *</label>
+                            <input type="text" id="secretRegistry" class="form-input" required
+                                placeholder="harbor.example.com" style="font-family: monospace;">
+                            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">如: harbor.example.com 或
+                                123456.dkr.ecr.us-west-2.amazonaws.com</div>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">用户名 *</label>
+                            <input type="text" id="secretUsername" class="form-input" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">密码 *</label>
+                            <input type="password" id="secretPassword" class="form-input" required>
+                            <div id="secretPasswordHint" style="font-size: 11px; color: #64748b; margin-top: 4px;">
+                                留空表示不修改密码</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideCreateSecretModal()">取消</button>
+                    <button type="button" class="btn btn-primary"
+                        onclick="document.getElementById('createSecretForm').requestSubmit()">保存</button>
+                </div>
             </div>
         </div>
-    </div>
+        <!-- 任务详情模态框 -->
+        <div id="detailModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header"><span>任务详情仪表盘</span></div>
+                <div class="modal-body" id="taskDetail">
+                    <div class="loading">加载详情中...</div>
+                </div>
+                <div class="form-actions"><button type="button" class="btn btn-secondary"
+                        onclick="hideDetailModal()">关闭</button><button type="button" class="btn btn-primary"
+                        id="cancelTaskBtn" onclick="cancelCurrentTask()" style="display:none;">取消任务</button></div>
+            </div>
+        </div>
+        <!-- 添加镜像库镜像模态框 -->
+        <div id="addLibraryModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">添加常用镜像</div>
+                <div class="modal-body">
+                    <form id="addLibraryForm" onsubmit="addLibraryImage(event)">
+                        <div class="form-group">
+                            <label class="form-label">镜像列表 (每行一个镜像)</label>
+                            <textarea id="libImages" class="form-input" style="height: 200px; font-family: monospace;"
+                                placeholder="docker.io/library/nginx:latest&#10;cr01.home.lan/library/n8n:v0.1.1"
+                                required></textarea>
+                            <div style="font-size: 11px; color: #64748b; margin-top: 4px;">* 显示名将根据镜像路径自动生成</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideAddLibraryModal()">取消</button>
+                    <button type="button" class="btn btn-primary"
+                        onclick="document.getElementById('addLibraryForm').requestSubmit()">保存</button>
+                </div>
+            </div>
+        </div>
 
-    <!-- 登录遮罩 -->
-    <div id="loginOverlay">
-        <div class="login-card">
-            <h2 style="margin-bottom: 24px; text-align: center; color: #1890ff;">镜像预热控制台（IPS）</h2>
-            <form onsubmit="login(event)">
-                <div class="form-group"><label class="form-label">用户名</label><input type="text" id="loginUser"
-                        class="form-input" required autofocus></div>
-                <div class="form-group"><label class="form-label">密码</label><input type="password" id="loginPass"
-                        class="form-input" required></div><button type="submit" class="btn btn-primary"
-                    style="width: 100%; padding: 12px; margin-top: 10px; font-size: 16px;">立即登录</button>
-            </form>
-        </div>
-    </div>
-    <!-- 创建用户模态框 -->
-    <div id="createUserModal" class="modal">
-        <div class="modal-content" style="height: auto; width: 400px; max-width: 90vw;">
-            <div class="modal-header">添加新用户</div>
-            <div class="modal-body">
-                <form id="createUserForm" onsubmit="createUser(event)">
-                    <div class="form-group"><label class="form-label">用户名 *</label><input type="text" id="newUsername"
-                            class="form-input" required></div>
-                    <div class="form-group"><label class="form-label">密码 *</label><input type="password"
-                            id="newPassword" class="form-input" required></div>
-                    <div class="form-group"><label class="form-label">角色</label><select id="newRole" class="form-input">
-                            <option value="viewer">观察员 (Viewer)</option>
-                            <option value="admin">管理员 (Admin)</option>
-                        </select></div>
+        <!-- 登录遮罩 -->
+        <div id="loginOverlay">
+            <div class="login-card">
+                <h2 style="margin-bottom: 24px; text-align: center; color: #1890ff;">镜像预热控制台（IPS）</h2>
+                <form onsubmit="login(event)">
+                    <div class="form-group"><label class="form-label">用户名</label><input type="text" id="loginUser"
+                            class="form-input" required autofocus></div>
+                    <div class="form-group"><label class="form-label">密码</label><input type="password" id="loginPass"
+                            class="form-input" required></div><button type="submit" class="btn btn-primary"
+                        style="width: 100%; padding: 12px; margin-top: 10px; font-size: 16px;">立即登录</button>
                 </form>
             </div>
-            <div class="form-actions"><button type="button" class="btn btn-secondary"
-                    onclick="hideCreateUserModal()">取消</button><button type="button" class="btn btn-primary"
-                    onclick="document.getElementById('createUserForm').requestSubmit()">确认创建</button>
+        </div>
+        <!-- 创建用户模态框 -->
+        <div id="createUserModal" class="modal">
+            <div class="modal-content" style="height: auto; width: 400px; max-width: 90vw;">
+                <div class="modal-header">添加新用户</div>
+                <div class="modal-body">
+                    <form id="createUserForm" onsubmit="createUser(event)">
+                        <div class="form-group"><label class="form-label">用户名 *</label><input type="text"
+                                id="newUsername" class="form-input" required></div>
+                        <div class="form-group"><label class="form-label">密码 *</label><input type="password"
+                                id="newPassword" class="form-input" required></div>
+                        <div class="form-group"><label class="form-label">角色</label><select id="newRole"
+                                class="form-input">
+                                <option value="viewer">观察员 (Viewer)</option>
+                                <option value="admin">管理员 (Admin)</option>
+                            </select></div>
+                    </form>
+                </div>
+                <div class="form-actions"><button type="button" class="btn btn-secondary"
+                        onclick="hideCreateUserModal()">取消</button><button type="button" class="btn btn-primary"
+                        onclick="document.getElementById('createUserForm').requestSubmit()">确认创建</button>
+                </div>
             </div>
         </div>
-    </div>
-    <!-- 修改密码模态框 -->
-    <div id="changePasswordModal" class="modal">
-        <div class="modal-content" style="height: auto; width: 400px; max-width: 90vw;">
-            <div class="modal-header">修改密码</div>
-            <div class="modal-body">
-                <form id="changePasswordForm" onsubmit="changePassword(event)">
-                    <input type="hidden" id="pwTargetUserId">
-                    <div class="form-group">
-                        <label class="form-label">目标用户</label>
-                        <input type="text" id="pwTargetUsername" class="form-input" disabled>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">新密码 * (至少6位)</label>
-                        <input type="password" id="pwNewPassword" class="form-input" required minlength="6">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">确认新密码 *</label>
-                        <input type="password" id="pwConfirmPassword" class="form-input" required minlength="6">
-                    </div>
-                </form>
-            </div>
-            <div class="form-actions">
-                <button type="button" class="btn btn-secondary" onclick="hideChangePasswordModal()">取消</button>
-                <button type="button" class="btn btn-primary"
-                    onclick="document.getElementById('changePasswordForm').requestSubmit()">保存</button>
-            </div>
-        </div>
-    </div>
-    <!-- Confirm Modal -->
-    <div id="confirmModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <span id="confirmTitle">确认</span>
-                <span style="font-size: 24px; color: #9ca3af; cursor: pointer;" onclick="hideConfirmModal()">×</span>
-            </div>
-            <div class="modal-body">
-                <p id="confirmMessage" style="color: #4b5563; font-size: 14px;">Are you sure?</p>
-            </div>
-            <div class="modal-footer"
-                style="padding: 16px 24px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 12px;">
-                <button class="btn btn-secondary" onclick="hideConfirmModal()">取消</button>
-                <button id="confirmBtnAction" class="btn btn-primary">确定</button>
+        <!-- 修改密码模态框 -->
+        <div id="changePasswordModal" class="modal">
+            <div class="modal-content" style="height: auto; width: 400px; max-width: 90vw;">
+                <div class="modal-header">修改密码</div>
+                <div class="modal-body">
+                    <form id="changePasswordForm" onsubmit="changePassword(event)">
+                        <input type="hidden" id="pwTargetUserId">
+                        <div class="form-group">
+                            <label class="form-label">目标用户</label>
+                            <input type="text" id="pwTargetUsername" class="form-input" disabled>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">新密码 * (至少6位)</label>
+                            <input type="password" id="pwNewPassword" class="form-input" required minlength="6">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">确认新密码 *</label>
+                            <input type="password" id="pwConfirmPassword" class="form-input" required minlength="6">
+                        </div>
+                    </form>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="hideChangePasswordModal()">取消</button>
+                    <button type="button" class="btn btn-primary"
+                        onclick="document.getElementById('changePasswordForm').requestSubmit()">保存</button>
+                </div>
             </div>
         </div>
-    </div>
+        <!-- Confirm Modal -->
+        <div id="confirmModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span id="confirmTitle">确认</span>
+                    <span style="font-size: 24px; color: #9ca3af; cursor: pointer;"
+                        onclick="hideConfirmModal()">×</span>
+                </div>
+                <div class="modal-body">
+                    <p id="confirmMessage" style="color: #4b5563; font-size: 14px;">Are you sure?</p>
+                </div>
+                <div class="modal-footer"
+                    style="padding: 16px 24px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 12px;">
+                    <button class="btn btn-secondary" onclick="hideConfirmModal()">取消</button>
+                    <button id="confirmBtnAction" class="btn btn-primary">确定</button>
+                </div>
+            </div>
+        </div>
 
-    <!-- Toast Container -->
-    <div id="toastContainer" class="toast-container"></div>
+        <!-- Toast Container -->
+        <div id="toastContainer" class="toast-container"></div>
 
-    <script src="app.js?v=2.0.1"></script>
+        <script src="app.js?v=2.0.1"></script>
 </body>
 
 </html>

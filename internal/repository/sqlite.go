@@ -83,11 +83,38 @@ func (r *SQLiteRepository) initSchema() error {
 		created_at DATETIME
 	);`
 
-	for _, schema := range []string{taskSchema, userSchema, tokenSchema, librarySchema} {
+	// 私有仓库认证表
+	secretSchema := `
+	CREATE TABLE IF NOT EXISTS registry_secrets (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT UNIQUE,
+		registry TEXT NOT NULL,
+		username TEXT NOT NULL,
+		password TEXT NOT NULL,
+		created_at DATETIME,
+		updated_at DATETIME
+	);`
+
+	// 创建基础表
+	for _, schema := range []string{taskSchema, userSchema, tokenSchema, librarySchema, secretSchema} {
 		if _, err := r.db.Exec(schema); err != nil {
 			return err
 		}
 	}
+
+	// 数据库迁移：为 tasks 表添加新列（向后兼容）
+	migrations := []string{
+		"ALTER TABLE tasks ADD COLUMN secret_id INTEGER",
+		"ALTER TABLE tasks ADD COLUMN registry TEXT",
+		"ALTER TABLE tasks ADD COLUMN username TEXT",
+		"ALTER TABLE tasks ADD COLUMN password TEXT",
+	}
+
+	for _, migration := range migrations {
+		// 忽略错误（列可能已存在）
+		r.db.Exec(migration)
+	}
+
 	return nil
 }
 
@@ -99,14 +126,14 @@ func (r *SQLiteRepository) CreateTask(ctx context.Context, task *models.Task) er
 	nodeStatsJSON, _ := json.Marshal(task.NodeStatuses)
 	failedNodesJSON, _ := json.Marshal(task.FailedNodes)
 
-	query := `INSERT INTO tasks (id, images, batch_size, priority, max_retries, retry_delay, retry_strategy, 
-		webhook_url, status, progress, node_statuses, failed_nodes, error_message, created_at, started_at, finished_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+	query := `INSERT INTO tasks (id, images, batch_size, priority, max_retries, retry_delay, retry_strategy,
+		webhook_url, status, progress, node_statuses, failed_nodes, error_message, secret_id, registry, username, password, created_at, started_at, finished_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
 
 	_, err := r.db.ExecContext(ctx, query,
 		task.ID, imagesJSON, task.BatchSize, task.Priority, task.MaxRetries, task.RetryDelay, task.RetryStrategy,
 		task.WebhookURL, task.Status, progressJSON, nodeStatsJSON, failedNodesJSON, task.ErrorMessage,
-		task.CreatedAt, task.StartedAt, task.FinishedAt)
+		task.SecretID, task.Registry, task.Username, task.Password, task.CreatedAt, task.StartedAt, task.FinishedAt)
 	return err
 }
 
@@ -125,8 +152,8 @@ func (r *SQLiteRepository) UpdateTask(ctx context.Context, task *models.Task) er
 }
 
 func (r *SQLiteRepository) GetTask(ctx context.Context, id string) (*models.Task, error) {
-	query := `SELECT id, images, batch_size, priority, max_retries, retry_delay, retry_strategy, 
-		webhook_url, status, progress, node_statuses, failed_nodes, error_message, created_at, started_at, finished_at 
+	query := `SELECT id, images, batch_size, priority, max_retries, retry_delay, retry_strategy,
+		webhook_url, status, progress, node_statuses, failed_nodes, error_message, secret_id, registry, username, password, created_at, started_at, finished_at
 		FROM tasks WHERE id = ?`
 
 	row := r.db.QueryRowContext(ctx, query, id)
@@ -135,6 +162,7 @@ func (r *SQLiteRepository) GetTask(ctx context.Context, id string) (*models.Task
 
 	err := row.Scan(&task.ID, &imagesJSON, &task.BatchSize, &task.Priority, &task.MaxRetries, &task.RetryDelay, &task.RetryStrategy,
 		&task.WebhookURL, &task.Status, &progressJSON, &nodeStatsJSON, &failedNodesJSON, &task.ErrorMessage,
+		&task.SecretID, &task.Registry, &task.Username, &task.Password,
 		&task.CreatedAt, &task.StartedAt, &task.FinishedAt)
 
 	if err == sql.ErrNoRows {
@@ -160,8 +188,8 @@ func (r *SQLiteRepository) ListTasks(ctx context.Context, offset, limit int) ([]
 		return nil, 0, err
 	}
 
-	query := `SELECT id, images, batch_size, priority, max_retries, retry_delay, retry_strategy, 
-		webhook_url, status, progress, node_statuses, failed_nodes, error_message, created_at, started_at, finished_at 
+	query := `SELECT id, images, batch_size, priority, max_retries, retry_delay, retry_strategy,
+		webhook_url, status, progress, node_statuses, failed_nodes, error_message, secret_id, registry, username, password, created_at, started_at, finished_at
 		FROM tasks ORDER BY created_at DESC LIMIT ? OFFSET ?`
 
 	rows, err := r.db.QueryContext(ctx, query, limit, offset)
@@ -177,6 +205,7 @@ func (r *SQLiteRepository) ListTasks(ctx context.Context, offset, limit int) ([]
 
 		err := rows.Scan(&task.ID, &imagesJSON, &task.BatchSize, &task.Priority, &task.MaxRetries, &task.RetryDelay, &task.RetryStrategy,
 			&task.WebhookURL, &task.Status, &progressJSON, &nodeStatsJSON, &failedNodesJSON, &task.ErrorMessage,
+			&task.SecretID, &task.Registry, &task.Username, &task.Password,
 			&task.CreatedAt, &task.StartedAt, &task.FinishedAt)
 		if err != nil {
 			return nil, 0, err
@@ -353,5 +382,100 @@ func (r *SQLiteRepository) ListImages(ctx context.Context, offset, limit int) ([
 
 func (r *SQLiteRepository) DeleteImage(ctx context.Context, id int64) error {
 	_, err := r.db.ExecContext(ctx, "DELETE FROM image_library WHERE id = ?", id)
+	return err
+}
+
+func (r *SQLiteRepository) CreateSecret(ctx context.Context, secret *models.RegistrySecret) error {
+	now := time.Now()
+	secret.CreatedAt = now
+	secret.UpdatedAt = now
+
+	result, err := r.db.ExecContext(ctx,
+		"INSERT INTO registry_secrets (name, registry, username, password, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
+		secret.Name, secret.Registry, secret.Username, secret.Password, now, now)
+	if err != nil {
+		return err
+	}
+	id, _ := result.LastInsertId()
+	secret.ID = id
+	return nil
+}
+
+func (r *SQLiteRepository) GetSecret(ctx context.Context, id int64) (*models.RegistrySecret, error) {
+	var secret models.RegistrySecret
+	err := r.db.QueryRowContext(ctx,
+		"SELECT id, name, registry, username, created_at, updated_at FROM registry_secrets WHERE id = ?",
+		id).Scan(&secret.ID, &secret.Name, &secret.Registry, &secret.Username, &secret.CreatedAt, &secret.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrTaskNotFound
+	}
+	return &secret, err
+}
+
+func (r *SQLiteRepository) GetSecretByName(ctx context.Context, name string) (*models.RegistrySecret, error) {
+	var secret models.RegistrySecret
+	err := r.db.QueryRowContext(ctx,
+		"SELECT id, name, registry, username, created_at, updated_at FROM registry_secrets WHERE name = ?",
+		name).Scan(&secret.ID, &secret.Name, &secret.Registry, &secret.Username, &secret.CreatedAt, &secret.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrTaskNotFound
+	}
+	return &secret, err
+}
+
+func (r *SQLiteRepository) GetSecretCredentials(ctx context.Context, id int64) (*models.RegistrySecret, error) {
+	var secret models.RegistrySecret
+	err := r.db.QueryRowContext(ctx,
+		"SELECT id, name, registry, username, password, created_at, updated_at FROM registry_secrets WHERE id = ?",
+		id).Scan(&secret.ID, &secret.Name, &secret.Registry, &secret.Username, &secret.Password, &secret.CreatedAt, &secret.UpdatedAt)
+	if err == sql.ErrNoRows {
+		return nil, ErrTaskNotFound
+	}
+	return &secret, err
+}
+
+func (r *SQLiteRepository) ListSecrets(ctx context.Context, offset, limit int) ([]*models.SecretListItem, int, error) {
+	var total int
+	if err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM registry_secrets").Scan(&total); err != nil {
+		return nil, 0, err
+	}
+
+	rows, err := r.db.QueryContext(ctx,
+		"SELECT id, name, registry, username, created_at, updated_at FROM registry_secrets ORDER BY created_at DESC LIMIT ? OFFSET ?",
+		limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var secrets []*models.SecretListItem
+	for rows.Next() {
+		var secret models.SecretListItem
+		if err := rows.Scan(&secret.ID, &secret.Name, &secret.Registry, &secret.Username, &secret.CreatedAt, &secret.UpdatedAt); err != nil {
+			return nil, 0, err
+		}
+		secrets = append(secrets, &secret)
+	}
+	return secrets, total, nil
+}
+
+func (r *SQLiteRepository) UpdateSecret(ctx context.Context, secret *models.RegistrySecret) error {
+	secret.UpdatedAt = time.Now()
+
+	if secret.Password != "" {
+		_, err := r.db.ExecContext(ctx,
+			"UPDATE registry_secrets SET name = ?, registry = ?, username = ?, password = ?, updated_at = ? WHERE id = ?",
+			secret.Name, secret.Registry, secret.Username, secret.Password, secret.UpdatedAt, secret.ID)
+		return err
+	}
+
+	_, err := r.db.ExecContext(ctx,
+		"UPDATE registry_secrets SET name = ?, registry = ?, username = ?, updated_at = ? WHERE id = ?",
+		secret.Name, secret.Registry, secret.Username, secret.UpdatedAt, secret.ID)
+	return err
+}
+
+func (r *SQLiteRepository) DeleteSecret(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM registry_secrets WHERE id = ?", id)
 	return err
 }

@@ -11,14 +11,26 @@ import (
 func Run(images []string, criSocketPath string) {
 	results := make(map[string]int)
 
+	// 读取凭据（格式：username:password）
+	registryCreds := os.Getenv("REGISTRY_CREDS")
+
 	fmt.Printf("Starting pre-warm for %d images using socket %s\n", len(images), criSocketPath)
+	if registryCreds != "" {
+		fmt.Println("Using registry credentials for authentication")
+	}
 
 	for _, img := range images {
 		fmt.Printf("Pulling %s...\n", img)
 
 		// 构造 crictl 命令
 		// 注意：我们需要通过环境变量或参数指定 socket
-		cmd := exec.Command("crictl", "--image-endpoint", "unix://"+criSocketPath, "pull", img)
+		var cmd *exec.Cmd
+		if registryCreds != "" {
+			// 使用 --creds 参数进行认证
+			cmd = exec.Command("crictl", "--image-endpoint", "unix://"+criSocketPath, "pull", "--creds", registryCreds, img)
+		} else {
+			cmd = exec.Command("crictl", "--image-endpoint", "unix://"+criSocketPath, "pull", img)
+		}
 
 		output, err := cmd.CombinedOutput()
 		if err != nil {

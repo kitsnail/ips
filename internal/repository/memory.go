@@ -129,3 +129,34 @@ func (r *MemoryRepository) ListTokens(ctx context.Context, userID int64) ([]*mod
 	return nil, nil
 }
 func (r *MemoryRepository) DeleteToken(ctx context.Context, id int64) error { return nil }
+
+func (r *MemoryRepository) CreateSecret(ctx context.Context, secret *models.RegistrySecret) error {
+	return nil
+}
+func (r *MemoryRepository) GetSecret(ctx context.Context, id int64) (*models.RegistrySecret, error) {
+	return nil, ErrTaskNotFound
+}
+func (r *MemoryRepository) GetSecretByName(ctx context.Context, name string) (*models.RegistrySecret, error) {
+	return nil, ErrTaskNotFound
+}
+func (r *MemoryRepository) ListSecrets(ctx context.Context, offset, limit int) ([]*models.SecretListItem, int, error) {
+	return nil, 0, nil
+}
+func (r *MemoryRepository) UpdateSecret(ctx context.Context, secret *models.RegistrySecret) error {
+	return nil
+}
+func (r *MemoryRepository) DeleteSecret(ctx context.Context, id int64) error { return nil }
+func (r *MemoryRepository) GetSecretCredentials(ctx context.Context, id int64) (*models.RegistrySecret, error) {
+	return nil, ErrTaskNotFound
+}
+
+func (r *MemoryRepository) CreateLibraryImage(ctx context.Context, image *models.LibraryImage) error {
+	return nil
+}
+func (r *MemoryRepository) GetLibraryImage(ctx context.Context, id int64) (*models.LibraryImage, error) {
+	return nil, ErrTaskNotFound
+}
+func (r *MemoryRepository) ListLibraryImages(ctx context.Context, offset, limit int) ([]*models.LibraryImage, int, error) {
+	return nil, 0, nil
+}
+func (r *MemoryRepository) DeleteLibraryImage(ctx context.Context, id int64) error { return nil }

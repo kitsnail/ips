@@ -126,6 +126,7 @@ func main() {
 	// 5. 初始化任务管理器
 	taskManager := service.NewTaskManager(
 		repo,
+		repo,
 		nodeFilter,
 		batchScheduler,
 		statusTracker,
@@ -134,7 +135,7 @@ func main() {
 	logger.Info("Task manager initialized")
 
 	// 6. 设置路由
-	router := api.SetupRouter(logger, taskManager, authService, repo, repo)
+	router := api.SetupRouter(logger, taskManager, authService, repo, repo, repo)
 
 	// 6. 创建HTTP服务器
 	port := os.Getenv("SERVER_PORT")

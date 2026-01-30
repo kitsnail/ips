@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ips-apiserver
-  namespace: ips-system
+  namespace: ips
   labels:
     app: ips
     component: apiserver
@@ -20,21 +20,26 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "watch"]
-
+  
   # 创建和管理 Jobs
   - apiGroups: ["batch"]
     resources: ["jobs"]
     verbs: ["get", "list", "watch", "create", "delete"]
-
+  
   # 读取 Pods 状态
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["get", "list", "watch"]
-
+  
   # 读取 Pods 日志（可选，用于调试）
   - apiGroups: [""]
     resources: ["pods/log"]
     verbs: ["get"]
+  
+  # 创建和管理 Secrets（用于私有镜像仓库认证）
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "create", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -50,4 +55,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: ips-apiserver
-    namespace: ips-system
+    namespace: ips
+
