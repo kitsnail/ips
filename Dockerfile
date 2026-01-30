@@ -5,7 +5,7 @@ FROM golang:1.24-alpine AS builder
 RUN apk add --no-cache git make wget tar
 
 # 下载 crictl
-ENV CRICTL_VERSION=v1.31.0
+ENV CRICTL_VERSION=v1.35.0
 RUN wget https://github.com/kubernetes-sigs/cri-tools/releases/download/${CRICTL_VERSION}/crictl-${CRICTL_VERSION}-linux-amd64.tar.gz && \
     tar -zxvf crictl-${CRICTL_VERSION}-linux-amd64.tar.gz -C /usr/local/bin && \
     rm crictl-${CRICTL_VERSION}-linux-amd64.tar.gz
