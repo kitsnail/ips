@@ -254,7 +254,7 @@ func (m *ScheduledTaskManager) executeTask(scheduledTaskID string) (string, erro
 	execution := &models.ScheduledExecution{
 		ScheduledTaskID: scheduledTaskID,
 		TriggeredAt:     triggeredAt,
-		Status:          models.ScheduledExecutionSuccess,
+		Status:          models.ScheduledExecutionRunning,
 		StartedAt:       triggeredAt,
 	}
 
@@ -406,17 +406,23 @@ func (m *ScheduledTaskManager) executeTask(scheduledTaskID string) (string, erro
 }
 
 func (m *ScheduledTaskManager) monitorExecution(scheduledTaskID, taskID string, execution *models.ScheduledExecution, timeoutSeconds int) {
-	ctx := context.Background()
+	var monitorCtx context.Context
+	var cancel context.CancelFunc
+
 	if timeoutSeconds > 0 {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
-		defer cancel()
+		monitorCtx, cancel = context.WithTimeout(context.Background(), time.Duration(timeoutSeconds)*time.Second)
+	} else {
+		monitorCtx, cancel = context.WithCancel(context.Background())
 	}
+	defer cancel()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
-		case <-ctx.Done():
-			if timeoutSeconds > 0 && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		case <-monitorCtx.Done():
+			if timeoutSeconds > 0 && errors.Is(monitorCtx.Err(), context.DeadlineExceeded) {
 				execution.Status = models.ScheduledExecutionTimeout
 				execution.ErrorMessage = "Task execution timed out"
 				finishedAt := time.Now()
@@ -444,7 +450,7 @@ func (m *ScheduledTaskManager) monitorExecution(scheduledTaskID, taskID string, 
 				m.taskQueue[scheduledTaskID] = queue[1:]
 
 				m.logger.WithFields(logrus.Fields{
-					"scheduledTaskId": scheduledTaskID,
+					"scheduledTaskID": scheduledTaskID,
 					"queuedTaskId":    nextTaskID,
 				}).Info("Processing queued scheduled task execution")
 
@@ -453,6 +459,144 @@ func (m *ScheduledTaskManager) monitorExecution(scheduledTaskID, taskID string, 
 			m.mu.Unlock()
 
 			return
+
+		case <-ticker.C:
+			task, err := m.taskManager.GetTask(context.Background(), taskID)
+			if err != nil {
+				m.logger.WithFields(logrus.Fields{
+					"scheduledTaskId": scheduledTaskID,
+					"taskId":          taskID,
+					"error":           err,
+				}).Error("Failed to get task status during monitoring")
+				continue
+			}
+
+			switch task.Status {
+			case models.TaskCompleted:
+				execution.Status = models.ScheduledExecutionSuccess
+				finishedAt := time.Now()
+				execution.FinishedAt = &finishedAt
+				execution.DurationSeconds = finishedAt.Sub(execution.StartedAt).Seconds()
+
+				if err := m.executionRepo.UpdateExecution(context.Background(), execution); err != nil {
+					m.logger.WithFields(logrus.Fields{
+						"scheduledTaskId": scheduledTaskID,
+						"taskId":          taskID,
+						"error":           err,
+					}).Error("Failed to update execution record for completed task")
+				}
+
+				metrics.ScheduledTaskExecutionsTotal.WithLabelValues("success").Inc()
+
+				m.logger.WithFields(logrus.Fields{
+					"scheduledTaskId": scheduledTaskID,
+					"taskId":          taskID,
+				}).Info("Scheduled task execution completed successfully")
+
+				m.mu.Lock()
+				delete(m.executingTasks, scheduledTaskID)
+				m.mu.Unlock()
+
+				m.mu.Lock()
+				if queue, exists := m.taskQueue[scheduledTaskID]; exists && len(queue) > 0 {
+					nextTaskID := queue[0]
+					m.taskQueue[scheduledTaskID] = queue[1:]
+
+					m.logger.WithFields(logrus.Fields{
+						"scheduledTaskId": scheduledTaskID,
+						"queuedTaskId":    nextTaskID,
+					}).Info("Processing queued scheduled task execution")
+
+					go m.executeTask(scheduledTaskID)
+				}
+				m.mu.Unlock()
+
+				return
+
+			case models.TaskFailed:
+				execution.Status = models.ScheduledExecutionFailed
+				execution.ErrorMessage = "Underlying task failed"
+				finishedAt := time.Now()
+				execution.FinishedAt = &finishedAt
+				execution.DurationSeconds = finishedAt.Sub(execution.StartedAt).Seconds()
+
+				if err := m.executionRepo.UpdateExecution(context.Background(), execution); err != nil {
+					m.logger.WithFields(logrus.Fields{
+						"scheduledTaskId": scheduledTaskID,
+						"taskId":          taskID,
+						"error":           err,
+					}).Error("Failed to update execution record for failed task")
+				}
+
+				metrics.ScheduledTaskExecutionsTotal.WithLabelValues("failed").Inc()
+
+				m.logger.WithFields(logrus.Fields{
+					"scheduledTaskId": scheduledTaskID,
+					"taskId":          taskID,
+				}).Info("Scheduled task execution failed")
+
+				m.mu.Lock()
+				delete(m.executingTasks, scheduledTaskID)
+				m.mu.Unlock()
+
+				m.mu.Lock()
+				if queue, exists := m.taskQueue[scheduledTaskID]; exists && len(queue) > 0 {
+					nextTaskID := queue[0]
+					m.taskQueue[scheduledTaskID] = queue[1:]
+
+					m.logger.WithFields(logrus.Fields{
+						"scheduledTaskId": scheduledTaskID,
+						"queuedTaskId":    nextTaskID,
+					}).Info("Processing queued scheduled task execution")
+
+					go m.executeTask(scheduledTaskID)
+				}
+				m.mu.Unlock()
+
+				return
+
+			case models.TaskCancelled:
+				execution.Status = models.ScheduledExecutionFailed
+				execution.ErrorMessage = "Underlying task was cancelled"
+				finishedAt := time.Now()
+				execution.FinishedAt = &finishedAt
+				execution.DurationSeconds = finishedAt.Sub(execution.StartedAt).Seconds()
+
+				if err := m.executionRepo.UpdateExecution(context.Background(), execution); err != nil {
+					m.logger.WithFields(logrus.Fields{
+						"scheduledTaskId": scheduledTaskID,
+						"taskId":          taskID,
+						"error":           err,
+					}).Error("Failed to update execution record for cancelled task")
+				}
+
+				metrics.ScheduledTaskExecutionsTotal.WithLabelValues("failed").Inc()
+
+				m.logger.WithFields(logrus.Fields{
+					"scheduledTaskId": scheduledTaskID,
+					"taskId":          taskID,
+				}).Info("Scheduled task execution was cancelled")
+
+				m.mu.Lock()
+				delete(m.executingTasks, scheduledTaskID)
+				m.mu.Unlock()
+
+				m.mu.Lock()
+				if queue, exists := m.taskQueue[scheduledTaskID]; exists && len(queue) > 0 {
+					nextTaskID := queue[0]
+					m.taskQueue[scheduledTaskID] = queue[1:]
+
+					m.logger.WithFields(logrus.Fields{
+						"scheduledTaskId": scheduledTaskID,
+						"queuedTaskId":    nextTaskID,
+					}).Info("Processing queued scheduled task execution")
+
+					go m.executeTask(scheduledTaskID)
+				}
+				m.mu.Unlock()
+
+				return
+			}
 		}
 	}
 }

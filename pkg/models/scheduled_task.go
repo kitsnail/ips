@@ -18,6 +18,7 @@ const (
 type ScheduledTaskExecutionStatus string
 
 const (
+	ScheduledExecutionRunning ScheduledTaskExecutionStatus = "running"
 	ScheduledExecutionSuccess ScheduledTaskExecutionStatus = "success"
 	ScheduledExecutionFailed  ScheduledTaskExecutionStatus = "failed"
 	ScheduledExecutionSkipped ScheduledTaskExecutionStatus = "skipped"

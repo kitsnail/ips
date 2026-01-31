@@ -21,6 +21,25 @@ func NewSQLiteRepository(dsn string) (*SQLiteRepository, error) {
 		return nil, fmt.Errorf("failed to open sqlite: %v", err)
 	}
 
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(time.Minute * 5)
+
+	_, err = db.Exec("PRAGMA journal_mode=WAL;")
+	if err != nil {
+		return nil, fmt.Errorf("failed to set WAL mode: %v", err)
+	}
+
+	_, err = db.Exec("PRAGMA synchronous=NORMAL;")
+	if err != nil {
+		return nil, fmt.Errorf("failed to set synchronous mode: %v", err)
+	}
+
+	_, err = db.Exec("PRAGMA busy_timeout=30000;")
+	if err != nil {
+		return nil, fmt.Errorf("failed to set busy timeout: %v", err)
+	}
+
 	repo := &SQLiteRepository{db: db}
 	if err := repo.initSchema(); err != nil {
 		return nil, fmt.Errorf("failed to init schema: %v", err)

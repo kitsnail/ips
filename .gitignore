@@ -8,6 +8,7 @@ bin/
 *.test
 *.out
 apiserver
+dev-prompts.md
 
 # Go workspace file
 go.work
