@@ -362,6 +362,168 @@
         .tab-panel.active {
             display: block;
         }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: none;
+        }
+
+        .status-badge.bg-pending {
+            background: var(--warning-color);
+            color: white;
+        }
+
+        .status-badge.bg-running {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .status-badge.bg-completed {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .status-badge.bg-failed {
+            background: var(--error-color);
+            color: white;
+        }
+
+        .status-badge.bg-cancelled {
+            background: var(--text-muted);
+            color: white;
+        }
+
+        .status-badge.bg-enabled {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .status-badge.bg-disabled {
+            background: var(--text-muted);
+            color: white;
+        }
+
+        .progress-ring {
+            position: relative;
+            width: 40px;
+            height: 40px;
+        }
+
+        .progress-ring svg {
+            transform: rotate(-90deg);
+        }
+
+        .progress-ring circle {
+            fill: none;
+            stroke-width: 4;
+        }
+
+        .progress-ring .bg {
+            stroke: var(--border-color);
+        }
+
+        .progress-ring .progress {
+            stroke: var(--primary-color);
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.3s ease;
+        }
+
+        .progress-ring .value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .action-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .action-dropdown-menu {
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: var(--sha-lg);
+            min-width: 140px;
+            z-index: 1000;
+            display: none;
+            padding: 8px 0;
+        }
+
+        .action-dropdown-menu.show {
+            display: block;
+        }
+
+        .action-dropdown-item {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 8px 16px;
+            font-size: 13px;
+            color: var(--text-main);
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .action-dropdown-item:hover {
+            background: var(--primary-light);
+            color: var(--primary-color);
+        }
+
+        .action-dropdown-item.danger {
+            color: var(--error-color);
+        }
+
+        .action-dropdown-item.danger:hover {
+            background: #fef2f2;
+        }
+
+        .task-row .image-cell {
+            position: relative;
+        }
+
+        .task-row .tooltip {
+            position: absolute;
+            top: 0;
+            left: 100%;
+            background: var(--text-main);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            z-index: 1000;
+            display: none;
+            margin-left: 8px;
+            box-shadow: var(--sha-md);
+            max-width: 400px;
+            white-space: normal;
+        }
+
+        .task-row .tooltip::after {
+            content: '';
+            position: absolute;
+            top: 12px;
+            left: -6px;
+            transform: translateY(-50%);
+            border: 6px solid transparent;
+            border-right-color: var(--text-main);
+        }
+
+        .task-row .tooltip-trigger:hover .tooltip {
+            display: block;
+        }
     </style>
 </head>
 

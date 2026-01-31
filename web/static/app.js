@@ -184,7 +184,14 @@ async function refreshRecentTasks(silent = false) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${tasks.map(task => `
+                    ${tasks.map(task => {
+                        const progress = task.progress || { percentage: 0 };
+                        const progressValue = Math.round(progress.percentage);
+                        const radius = 18;
+                        const circumference = 2 * Math.PI * radius;
+                        const strokeDashoffset = circumference - (progressValue / 100) * circumference;
+
+                        return `
                         <tr class="task-row" style="cursor: pointer;" onclick="showTaskDetail('${task.taskId}')">
                             <td><span class="status-badge bg-${task.status}">${getStatusText(task.status)}</span></td>
                             <td style="font-family: monospace; font-weight: 500;">${task.taskId}</td>
@@ -193,11 +200,13 @@ async function refreshRecentTasks(silent = false) {
                                 ${task.images.length > 1 ? `<div style="font-size: 11px; color: #6b7280;">+${task.images.length - 1} 个更多</div>` : ''}
                             </td>
                             <td>
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <div class="progress-bar" style="width: 80px;">
-                                        <div class="progress-fill" style="width: ${task.progress ? task.progress.percentage : 0}%"></div>
-                                    </div>
-                                    <span style="font-size: 12px; color: #6b7280;">${task.progress ? Math.round(task.progress.percentage) : 0}%</span>
+                                <div class="progress-ring">
+                                    <svg width="40" height="40">
+                                        <circle class="bg" cx="20" cy="20" r="${radius}" />
+                                        <circle class="progress" cx="20" cy="20" r="${radius}"
+                                            style="stroke-dasharray: ${circumference} ${circumference}; stroke-dashoffset: ${strokeDashoffset};" />
+                                    </svg>
+                                    <div class="value">${progressValue}%</div>
                                 </div>
                             </td>
                             <td style="color: #6b7280;">${formatTime(task.createdAt)}</td>
@@ -205,7 +214,8 @@ async function refreshRecentTasks(silent = false) {
                                 <button class="btn btn-secondary btn-sm" onclick="showTaskDetail('${task.taskId}')">详情</button>
                             </td>
                         </tr>
-                    `).join('')}
+                        `;
+                    }).join('')}
                 </tbody>
             </table>
         `;
@@ -246,10 +256,10 @@ async function renderScheduledTasks() {
             <td>${task.cronExpr}</td>
             <td><span class="status-badge bg-${task.enabled ? 'enabled' : 'disabled'}">${task.enabled ? '已启用' : '已禁用'}</span></td>
             <td>${task.overlapPolicy}</td>
-            <td>${task.enabled ? '<button class="btn btn-sm btn-secondary" onclick="disableScheduledTask(\''${task.id}'\')">禁用</button>' : '<button class="btn btn-sm btn-secondary" onclick="enableScheduledTask(\''${task.id}'\')">启用</button>'}</td>
+            <td>${task.enabled ? `<button class="btn btn-sm btn-secondary" onclick="disableScheduledTask('${task.id}')">禁用</button>` : `<button class="btn btn-sm btn-secondary" onclick="enableScheduledTask('${task.id}')">启用</button>`}</td>
             <td>
-                <button class="btn btn-sm btn-primary" onclick="triggerScheduledTask(\''${task.id}'\')">触发</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteScheduledTask(\''${task.id}'\')">删除</button>
+                <button class="btn btn-sm btn-primary" onclick="triggerScheduledTask('${task.id}')">触发</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteScheduledTask('${task.id}')">删除</button>
             </td>
         `;
         tbody.appendChild(row);
@@ -390,11 +400,6 @@ function hideCreateScheduledTaskModal() {
     document.getElementById('createScheduledTaskModal').classList.remove('show');
     document.getElementById('createScheduledTaskModal').classList.remove('active');
 }
-    } catch (error) {
-        console.error('Failed to load tasks:', error);
-        showToast('加载任务失败', 'error');
-    }
-}
 
 async function refreshScheduledTasks(silent = false) {
     if (!checkAuth()) return;
@@ -412,9 +417,6 @@ async function refreshScheduledTasks(silent = false) {
         console.error('Failed to load scheduled tasks:', error);
         showToast('加载定时任务失败', 'error');
     }
-}
-    hideLogin();
-    return true;
 }
 
 function loadUser() {
@@ -518,7 +520,6 @@ function renderTasks() {
     const tasks = state.tasks;
     const search = state.filter.search.toLowerCase();
 
-    // Client-side search and status filtering on the CURRENT page data
     const filtered = tasks.filter(t => {
         const matchesSearch = t.taskId.toLowerCase().includes(search);
         const matchesStatus = !state.filter.status || t.status === state.filter.status;
@@ -530,15 +531,12 @@ function renderTasks() {
         return;
     }
 
-    // Update Select All Checkbox state
     const selectAllCheckbox = document.getElementById('selectAll');
     if (selectAllCheckbox) {
         selectAllCheckbox.checked = filtered.length > 0 && filtered.every(t => state.selectedTasks.has(t.taskId));
         selectAllCheckbox.indeterminate = filtered.some(t => state.selectedTasks.has(t.taskId)) && !filtered.every(t => state.selectedTasks.has(t.taskId));
     }
 
-    // Update Batch Delete Button
-    // Update Batch Delete Button
     const batchDeleteBtn = document.getElementById('batchDeleteBtn');
     if (batchDeleteBtn) {
         if (state.selectedTasks.size > 0) {
@@ -552,47 +550,76 @@ function renderTasks() {
         }
     }
 
-    tbody.innerHTML = filtered.map(task => `
+    tbody.innerHTML = filtered.map(task => {
+        const progress = task.progress || { percentage: 0 };
+        const progressValue = Math.round(progress.percentage);
+        const radius = 18;
+        const circumference = 2 * Math.PI * radius;
+        const strokeDashoffset = circumference - (progressValue / 100) * circumference;
+
+        return `
         <tr class="task-row">
             <td class="col-checkbox">
-                <input type="checkbox" 
-                    class="task-checkbox" 
+                <input type="checkbox"
+                    class="task-checkbox"
                     onchange="toggleTaskSelection('${task.taskId}')"
                     ${state.selectedTasks.has(task.taskId) ? 'checked' : ''}
                 >
             </td>
             <td><span class="status-badge bg-${task.status}">${getStatusText(task.status)}</span></td>
             <td style="font-family: monospace; font-weight: 500;">${task.taskId}</td>
-            <td>
-                <div style="font-size: 13px; font-weight: 500; color: #111827;">${task.images[0]}</div>
-                ${task.images.length > 1 ? `<div style="font-size: 11px; color: #6b7280;">+${task.images.length - 1} 个更多</div>` : ''}
-            </td>
-            <td>    
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <div class="progress-bar" style="width: 80px; margin: 0;">
-                        <div class="progress-fill" style="width: ${task.progress ? task.progress.percentage : 0}%"></div>
+            <td class="image-cell">
+                <div class="tooltip-trigger" style="display: inline-block;">
+                    <div style="font-size: 13px; font-weight: 500; color: #111827;">${task.images[0]}</div>
+                    ${task.images.length > 1 ? `<div style="font-size: 11px; color: #6b7280;">+${task.images.length - 1} 个更多</div>` : ''}
+                    <div class="tooltip" style="bottom: 100%; left: 0; transform: none;">
+                        ${task.images.map(img => `<div style="font-family: monospace; font-size: 11px; padding: 2px 0;">${img}</div>`).join('')}
                     </div>
-                    <span style="font-size: 12px; color: #6b7280;">${task.progress ? Math.round(task.progress.percentage) : 0}%</span>
+                </div>
+            </td>
+            <td>
+                <div class="progress-ring">
+                    <svg width="40" height="40">
+                        <circle class="bg" cx="20" cy="20" r="${radius}" />
+                        <circle class="progress" cx="20" cy="20" r="${radius}"
+                            style="stroke-dasharray: ${circumference} ${circumference}; stroke-dashoffset: ${strokeDashoffset};" />
+                    </svg>
+                    <div class="value">${progressValue}%</div>
                 </div>
             </td>
             <td style="color: #6b7280;">${formatTime(task.createdAt)}</td>
             <td>
-                <div style="display: flex; gap: 8px; justify-content: flex-end;">
-                    <button class="btn btn-secondary btn-sm" onclick="showTaskDetail('${task.taskId}')">
-                        详情
+                <div class="action-dropdown">
+                    <button class="btn btn-secondary btn-sm" onclick="toggleActionDropdown('${task.taskId}', event)">
+                        操作
+                        <svg class="icon" style="width: 12px; height: 12px; margin-left: 4px;" viewBox="0 0 24 24">
+                            <path d="M19 9l-7 7-7-7" />
+                        </svg>
                     </button>
-                    ${task.status === 'running' || task.status === 'pending' ?
-            `<button class="btn btn-danger btn-sm" onclick="cancelTask('${task.taskId}')">
-                            取消
-                        </button>` :
-            `<button class="btn btn-danger btn-sm" onclick="deleteTask('${task.taskId}')">
-                            删除
-                        </button>`
-        }
+                    <div class="action-dropdown-menu" id="dropdown-${task.taskId.replace(/[^a-zA-Z0-9-]/g, '')}">
+                        <div class="action-dropdown-item" onclick="showTaskDetail('${task.taskId}')">
+                            查看详情
+                        </div>
+                        ${task.status === 'running' || task.status === 'pending' ? `
+                            <div class="action-dropdown-item danger" onclick="cancelTask('${task.taskId}')">
+                                取消任务
+                            </div>
+                        ` : `
+                            <div class="action-dropdown-item danger" onclick="deleteTask('${task.taskId}')">
+                                删除任务
+                            </div>
+                        `}
+                    </div>
                 </div>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
+
+    document.querySelectorAll('.action-dropdown button').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+    });
 }
 
 // Pagination Controls
@@ -858,6 +885,31 @@ function toggleTaskSelection(taskId) {
     renderTasks(); // Re-render to update UI states
 }
 
+function toggleActionDropdown(taskId, event) {
+    const dropdownId = `dropdown-${taskId.replace(/[^a-zA-Z0-9-]/g, '')}`;
+    const dropdown = document.getElementById(dropdownId);
+
+    document.querySelectorAll('.action-dropdown-menu').forEach(menu => {
+        if (menu.id !== dropdownId) {
+            menu.classList.remove('show');
+        }
+    });
+
+    if (dropdown) {
+        dropdown.classList.toggle('show');
+    }
+}
+
+function closeAllActionDropdowns() {
+    document.querySelectorAll('.action-dropdown-menu').forEach(menu => {
+        menu.classList.remove('show');
+    });
+}
+
+document.addEventListener('click', () => {
+    closeAllActionDropdowns();
+});
+
 function toggleSelectAll() {
     const tasks = state.tasks;
     // Get visible tasks based on search filter if needed
@@ -1003,7 +1055,6 @@ function switchTab(tab) {
     } else if (tab === 'tasks' && state.tasks.length === 0) {
         refreshTasks();
     }
-}
 }
 
 function showCreateTaskModal() {
