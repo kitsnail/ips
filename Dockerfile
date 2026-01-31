@@ -1,3 +1,15 @@
+# 构建阶段
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+COPY frontend/package*.json frontend/ ./
+
+RUN npm ci
+
+COPY frontend/ .
+
+RUN npm run build
+
 # 运行阶段
 FROM alpine:latest
 
@@ -13,13 +25,16 @@ RUN addgroup -g 1000 ips && \
 
 WORKDIR /app
 
+# 从 frontend-builder 阶段复制构建产物
+COPY --from=frontend-builder /app/frontend/dist /app/web/dist
+
 # 从宿主机复制二进制文件 (必须预先 build)
 COPY bin/apiserver /app/apiserver
 # 从 scripts 目录复制 crictl
 COPY scripts/crictl /usr/local/bin/crictl
 
-# 复制 Web UI 静态文件
-COPY web /app/web
+# 复制其他静态文件（如果有）
+COPY web/static /app/web/static
 
 # 修改文件权限
 RUN chown -R ips:ips /app

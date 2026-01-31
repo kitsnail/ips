@@ -10,15 +10,15 @@ const { user, isAdmin } = useAuth()
 const activeTab = computed(() => route.path)
 
 const menuItems = [
-  { name: 'Dashboard', path: '/dashboard', label: '概览' },
-  { name: 'Tasks', path: '/tasks', label: '任务管理' },
-  { name: 'ScheduledTasks', path: '/scheduled', label: '定时任务' },
-  { name: 'Library', path: '/library', label: '镜像库' },
-  { name: 'Secrets', path: '/secrets', label: '仓库认证' },
+  { name: 'Dashboard', path: '/web/dashboard', label: '概览' },
+  { name: 'Tasks', path: '/web/tasks', label: '任务管理' },
+  { name: 'ScheduledTasks', path: '/web/scheduled', label: '定时任务' },
+  { name: 'Library', path: '/web/library', label: '镜像库' },
+  { name: 'Secrets', path: '/web/secrets', label: '仓库认证' },
 ]
 
 const adminMenuItems = [
-  { name: 'Admin', path: '/admin', label: '系统设置' },
+  { name: 'Admin', path: '/web/admin', label: '系统设置' },
 ]
 
 const logout = () => {
@@ -82,7 +82,7 @@ const logout = () => {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255,255,255, 0.9);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid #e2e8f0;

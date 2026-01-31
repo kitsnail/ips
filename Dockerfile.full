@@ -1,0 +1,77 @@
+# 生产版本 Dockerfile
+# 包含前端构建产物
+
+# 阶段 1: 构建前端
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app/frontend
+
+# 只复制 package 文件以利用缓存
+COPY frontend/package*.json frontend/ ./
+
+RUN npm ci --legacy-peer-deps
+
+# 复制所有源代码
+COPY frontend/ .
+
+# 构建前端生产版本
+RUN npm run build
+
+# 阶段 2: 构建 Go 后端
+FROM golang:1.23-alpine AS backend-builder
+
+WORKDIR /app
+
+# 复制 Go module 文件
+COPY go.mod go.sum ./
+
+# 下载依赖（利用 Docker 缓存）
+RUN go mod download
+
+# 复制源代码
+COPY . .
+
+# 构建 Go 二进制文件
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+    -ldflags="-w -s" \
+    -o /app/apiserver \
+    ./cmd/apiserver
+
+# 阶段 3: 最终运行镜像
+FROM alpine:latest
+
+# 安装运行时依赖
+RUN apk --no-cache add \
+    ca-certificates \
+    tzdata \
+    wget
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+
+# 创建非 root 用户
+RUN addgroup -g 1000 ips && \
+    adduser -D -u 1000 -G ips ips
+
+WORKDIR /app
+
+# 从构建阶段复制文件
+COPY --from=backend-builder /app/apiserver /app/apiserver
+COPY --from=frontend-builder /app/frontend/dist /app/web/dist
+COPY scripts/crictl /usr/local/bin/crictl
+
+# 修改文件权限
+RUN chown -R ips:ips /app
+
+# 切换到非 root 用户
+USER ips
+
+# 暴露端口
+EXPOSE 8080
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# 启动应用
+ENTRYPOINT ["/app/apiserver"]

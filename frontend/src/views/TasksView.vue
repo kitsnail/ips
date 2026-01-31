@@ -3,10 +3,13 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { taskApi } from '@/services/api'
 import type { Task } from '@/types/api'
+import TaskDetailModal from '@/components/TaskDetailModal.vue'
 
 const tasks = ref<Task[]>([])
 const loading = ref(false)
 const showCreateModal = ref(false)
+const showDetailModal = ref(false)
+const selectedTask = ref<Task | null>(null)
 let refreshInterval: number | null = null
 
 const refreshTasks = async () => {
@@ -26,7 +29,8 @@ const handleCreateSuccess = () => {
 }
 
 const showTaskDetail = (task: Task) => {
-  console.log('Show detail for task:', task.taskId)
+  selectedTask.value = task
+  showDetailModal.value = true
 }
 
 onMounted(() => {
@@ -84,6 +88,12 @@ onUnmounted(() => {
     <CreateTaskModal
       v-model:visible="showCreateModal"
       @success="handleCreateSuccess"
+    />
+
+    <TaskDetailModal
+      :visible="showDetailModal"
+      :task="selectedTask"
+      @update:visible="(val) => showDetailModal = val"
     />
   </div>
 </template>

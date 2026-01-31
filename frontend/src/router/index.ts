@@ -19,6 +19,18 @@ const router = createRouter({
           path: 'tasks',
           component: () => import('@/views/TasksView.vue'),
         },
+        {
+          path: 'scheduled',
+          component: () => import('@/views/ScheduledTasksView.vue'),
+        },
+        {
+          path: 'library',
+          component: () => import('@/views/LibraryView.vue'),
+        },
+        {
+          path: 'secrets',
+          component: () => import('@/views/SecretsView.vue'),
+        },
       ],
     },
   ],

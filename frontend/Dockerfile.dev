@@ -1,0 +1,27 @@
+# 多阶段构建 - 开发版本（支持前端热重载）
+# 用于本地开发：docker-compose up ips-frontend-dev
+
+# 阶段 1: 构建前端
+FROM node:20-alpine AS frontend-builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+
+COPY . .
+RUN npm install
+
+# 阶段 2: 运行开发服务器
+FROM node:20-alpine
+
+WORKDIR /app
+
+# 从构建阶段复制 node_modules
+COPY --from=frontend-builder /app/node_modules ./node_modules
+
+# 挂载源代码（在 docker-compose.yml 中配置）
+# COPY . .  # 不复制，通过 volume 挂载
+
+EXPOSE 5173
+
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
