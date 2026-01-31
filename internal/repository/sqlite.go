@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/kitsnail/ips/pkg/models"
@@ -200,6 +201,42 @@ func (r *SQLiteRepository) CreateTask(ctx context.Context, task *models.Task) er
 	return err
 }
 
+// execWithRetry executes a database operation with retry logic for busy errors
+func (r *SQLiteRepository) execWithRetry(ctx context.Context, execFunc func() (sql.Result, error)) (sql.Result, error) {
+	var result sql.Result
+	var err error
+
+	// Try up to 5 times with exponential backoff
+	for i := 0; i < 5; i++ {
+		result, err = execFunc()
+
+		// If no error or context is cancelled, return immediately
+		if err == nil {
+			return result, nil
+		}
+
+		// Check if this is a busy error that we should retry
+		if strings.Contains(err.Error(), "database is locked") ||
+			strings.Contains(err.Error(), "SQLITE_BUSY") ||
+			strings.Contains(err.Error(), "database locked") {
+
+			// Wait before retrying (exponential backoff: 10ms, 20ms, 40ms, 80ms, 160ms)
+			waitTime := time.Millisecond * time.Duration(10*(1<<uint(i)))
+			select {
+			case <-time.After(waitTime):
+				continue
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+
+		// If it's not a busy error, return immediately
+		return nil, err
+	}
+
+	return result, err
+}
+
 func (r *SQLiteRepository) UpdateTask(ctx context.Context, task *models.Task) error {
 	progressJSON, _ := json.Marshal(task.Progress)
 	nodeStatsJSON, _ := json.Marshal(task.NodeStatuses)
@@ -208,9 +245,12 @@ func (r *SQLiteRepository) UpdateTask(ctx context.Context, task *models.Task) er
 	query := `UPDATE tasks SET status=?, progress=?, node_statuses=?, failed_nodes=?, error_message=?, 
 		started_at=?, finished_at=? WHERE id=?`
 
-	_, err := r.db.ExecContext(ctx, query,
-		task.Status, progressJSON, nodeStatsJSON, failedNodesJSON, task.ErrorMessage,
-		task.StartedAt, task.FinishedAt, task.ID)
+	_, err := r.execWithRetry(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query,
+			task.Status, progressJSON, nodeStatsJSON, failedNodesJSON, task.ErrorMessage,
+			task.StartedAt, task.FinishedAt, task.ID)
+	})
+
 	return err
 }
 
@@ -650,9 +690,11 @@ func (r *SQLiteRepository) UpdateScheduledTask(ctx context.Context, task *models
 	query := `UPDATE scheduled_tasks SET name=?, description=?, cron_expr=?, enabled=?, task_config=?,
 		overlap_policy=?, timeout_seconds=?, updated_at=? WHERE id=?`
 
-	_, err := r.db.ExecContext(ctx, query,
-		task.Name, task.Description, task.CronExpr, task.Enabled, taskConfigJSON,
-		task.OverlapPolicy, task.TimeoutSeconds, task.UpdatedAt, task.ID)
+	_, err := r.execWithRetry(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query,
+			task.Name, task.Description, task.CronExpr, task.Enabled, taskConfigJSON,
+			task.OverlapPolicy, task.TimeoutSeconds, task.UpdatedAt, task.ID)
+	})
 	return err
 }
 
@@ -668,10 +710,12 @@ func (r *SQLiteRepository) CreateExecution(ctx context.Context, execution *model
 		started_at, finished_at, duration_seconds, error_message, triggered_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 
-	res, err := r.db.ExecContext(ctx, query,
-		execution.ScheduledTaskID, execution.TaskID, execution.Status,
-		execution.StartedAt, execution.FinishedAt, execution.DurationSeconds,
-		execution.ErrorMessage, execution.TriggeredAt)
+	res, err := r.execWithRetry(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query,
+			execution.ScheduledTaskID, execution.TaskID, execution.Status,
+			execution.StartedAt, execution.FinishedAt, execution.DurationSeconds,
+			execution.ErrorMessage, execution.TriggeredAt)
+	})
 	if err != nil {
 		return err
 	}
@@ -745,7 +789,7 @@ func (r *SQLiteRepository) ListRunningExecutions(ctx context.Context, scheduledT
 		duration_seconds, error_message, triggered_at
 		FROM scheduled_executions WHERE status = ?`
 	var args []interface{}
-	args = append(args, models.ScheduledExecutionSuccess)
+	args = append(args, models.ScheduledExecutionRunning)
 	if scheduledTaskID != "" {
 		query += " AND scheduled_task_id = ?"
 		args = append(args, scheduledTaskID)
@@ -773,8 +817,11 @@ func (r *SQLiteRepository) ListRunningExecutions(ctx context.Context, scheduledT
 
 func (r *SQLiteRepository) UpdateExecution(ctx context.Context, execution *models.ScheduledExecution) error {
 	query := `UPDATE scheduled_executions SET status=?, finished_at=?, duration_seconds=?, error_message=? WHERE id=?`
-	_, err := r.db.ExecContext(ctx, query,
-		execution.Status, execution.FinishedAt, execution.DurationSeconds, execution.ErrorMessage, execution.ID)
+
+	_, err := r.execWithRetry(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, query,
+			execution.Status, execution.FinishedAt, execution.DurationSeconds, execution.ErrorMessage, execution.ID)
+	})
 	return err
 }
 
