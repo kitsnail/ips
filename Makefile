@@ -1,6 +1,6 @@
 .PHONY: help build run test clean fmt lint deps tidy
 .PHONY: docker-build docker-clean
-.PHONY: frontend-install frontend-dev frontend-build frontend-clean
+.PHONY: frontend-install frontend-dev frontend-build frontend-clean frontend-dev-docker
 
 # 默认目标
 .DEFAULT_GOAL := help
@@ -110,9 +110,9 @@ docker-build: ## 构建 Docker 镜像
 	@docker build --platform linux/amd64 -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 	@docker tag $(DOCKER_IMAGE):$(DOCKER_TAG) $(DOCKER_IMAGE):latest
 
-docker-build-dev: build ## 构建 Docker 镜像 (开发模式，使用宿主机二进制)
-	@echo "$(GREEN)Building Docker image $(DOCKER_IMAGE):$(DOCKER_TAG) (Dev mode)...$(RESET)"
-	@docker build --platform linux/amd64 -f Dockerfile-dev -t $(DOCKER_IMAGE):dev .
+docker-build-dev: ## 构建前端开发服务器Docker镜像
+	@echo "$(GREEN)Building frontend dev server Docker image...$(RESET)"
+	@docker build --platform linux/amd64 -f frontend/Dockerfile.dev -t ips-frontend-dev .
 
 docker-build-no-cache: ## 构建 Docker 镜像（不使用缓存）
 	@echo "$(GREEN)Building Docker image (no cache)...$(RESET)"
