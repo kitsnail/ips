@@ -299,13 +299,10 @@ async function createScheduledTask(event) {
     const name = document.getElementById('scheduledName').value.trim();
     const cronExpr = document.getElementById('scheduledCron').value.trim();
     const images = document.getElementById('scheduledImages').value.trim().split(',').map(s => s.trim());
-    const enabled = document.getElementById('scheduledEnabled').checked;
-    const overlapPolicy = document.getElementById('scheduledOverlap').value;
-    const timeout = parseInt(document.getElementById('scheduledTimeout').value) || 0;
-    const batchSize = parseInt(document.getElementById('scheduledBatchSize').value) || 10;
-    
-    if (!name || !cronExpr || images.length === 0) {
-        showToast('请填写必填字段', 'error');
+    const enabled = document.getElementById('scheduledEnabled').value === 'true';
+
+    if (!cronExpr.match(/^(\S+\s+\s+\s+\s+\d+)$/) && cronExpr.trim() !== '') {
+        showToast('无效的 Cron 表达式', 'error');
         return;
     }
     
@@ -393,7 +390,165 @@ async function deleteScheduledTask(id) {
 }
 
 function showCreateScheduledTaskModal() {
+    const cronInput = document.getElementById('scheduledCron');
+    cronInput.value = '';
+    updateNextExecutionPreview();
     document.getElementById('createScheduledTaskModal').classList.add('show');
+}
+
+function applyCronTemplate() {
+    const template = document.getElementById('cronTemplate').value;
+    if (template) {
+        document.getElementById('scheduledCron').value = template;
+    }
+    updateNextExecutionPreview();
+}
+
+function updateNextExecutionPreview() {
+    const cronExpr = document.getElementById('scheduledCron').value.trim();
+    const previewDiv = document.getElementById('nextExecutionPreview');
+
+    if (!cronExpr) {
+        previewDiv.textContent = '';
+        return;
+    }
+
+    try {
+        const nextExecutions = [];
+        const now = new Date();
+
+        for (let i = 0; i < 3; i++) {
+            const next = getNextCronExecution(cronExpr, now);
+            if (next) {
+                nextExecutions.push(next);
+                now = new Date(next.getTime() + 60000);
+            } else {
+                break;
+            }
+        }
+
+        if (nextExecutions.length > 0) {
+            previewDiv.innerHTML = `<span style="color: var(--success-color);">下次执行:</span> ${nextExecutions[0]}${nextExecutions.length > 1 ? `<br><span style="color: var(--text-secondary); font-size: 11px;">随后: ${nextExecutions.slice(1).join(', ')}</span>` : ''}`;
+        } else {
+            previewDiv.textContent = '无效的 Cron 表达式';
+        }
+    } catch (error) {
+        previewDiv.textContent = '无法解析 Cron 表达式';
+        console.error('Cron parse error:', error);
+    }
+}
+
+function getNextCronExecution(cronExpr, fromDate) {
+    const parts = cronExpr.trim().split(/\s+/);
+    if (parts.length < 6) return null;
+
+    const [minute, hour, day, month, weekday] = parts;
+    const date = new Date(fromDate.getTime());
+
+    let nextRun = new Date(date);
+
+    const setNextValid = (current, min, max) => {
+        let next = new Date(current);
+        if (min !== '*') {
+            next.setMinutes(parseInt(min));
+            while (next.getTime() <= current.getTime()) {
+                next.setMinutes(next.getMinutes() + 1);
+            }
+        }
+        if (max !== '*' && next.getMinutes() !== parseInt(max)) {
+            next.setMinutes(Math.min(next.getMinutes(), parseInt(max)));
+        }
+        return next;
+    };
+
+    const setNextHour = (current, min, max) => {
+        let next = new Date(current);
+        next.setHours(parseInt(hour));
+        next.setMinutes(0);
+        next.setSeconds(0);
+        if (next.getTime() <= current.getTime()) {
+            next.setDate(next.getDate() + 1);
+        }
+        if (min !== '*') {
+            next.setMinutes(parseInt(min));
+            if (next.getTime() <= current.getTime()) {
+                next.setHours(next.getHours() + 1);
+                if (next.getHours() < parseInt(hour)) {
+                    next.setDate(next.getDate() + 1);
+                }
+            }
+        }
+        return next;
+    };
+
+    const setNextDay = (current, day) => {
+        let next = new Date(current);
+        if (day !== '*') {
+            next.setDate(parseInt(day));
+            if (next.getTime() <= current.getTime()) {
+                next.setMonth(next.getMonth() + 1);
+            }
+        }
+        return next;
+    };
+
+    const setNextMonth = (current, month) => {
+        let next = new Date(current);
+        if (month !== '*') {
+            next.setMonth(parseInt(month) - 1);
+            if (next.getTime() <= current.getTime()) {
+                next.setFullYear(next.getFullYear() + 1);
+            }
+        }
+        return next;
+    };
+
+    const setNextWeekday = (current, weekday) => {
+        let next = new Date(current);
+        if (weekday !== '*') {
+            const targetWeekday = parseInt(weekday);
+            const currentWeekday = next.getDay();
+            const daysUntil = (targetWeekday - currentWeekday + 7) % 7;
+            if (daysUntil === 0 && next.getTime() > current.getTime()) {
+                return next;
+            }
+            next.setDate(next.getDate() + daysUntil);
+            next.setHours(0);
+            next.setMinutes(0);
+            next.setSeconds(0);
+        }
+        return next;
+    };
+
+    if (month !== '*') {
+        nextRun = setNextMonth(nextRun, month);
+    }
+
+    if (day !== '*') {
+        nextRun = setNextDay(nextRun, day);
+    }
+
+    if (weekday !== '*') {
+        nextRun = setNextWeekday(nextRun, weekday);
+    } else {
+        nextRun = setNextHour(nextRun, minute, minute);
+    }
+
+    if (hour !== '*') {
+        nextRun.setHours(parseInt(hour));
+        if (nextRun.getTime() <= date.getTime()) {
+            nextRun.setDate(nextRun.getDate() + 1);
+        }
+    }
+
+    nextRun.setSeconds(0);
+    nextRun.setMilliseconds(0);
+
+    if (nextRun.getTime() <= date.getTime()) {
+        return null;
+    }
+
+    return formatTime(nextRun);
 }
 
 function hideCreateScheduledTaskModal() {

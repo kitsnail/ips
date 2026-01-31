@@ -790,87 +790,103 @@
                          <path d="M14.74 9.93l-2.69-9.93-13.78 13.78 2.69 2.69 13.78 13.78 5.41 0 5.41-13.78 13.78 0 5.41 5.41-0 0-5.41-5.41 0-5.41z" />
                      </svg>
                      批量删除
-                 </button>
-             </div>
-             <div class="filter-bar">
-                 <select id="statusFilter" class="form-select" onchange="filterTasks()">
-                     <option value="">全部状态</option>
-                     <option value="pending">等待中</option>
-                     <option value="running">执行中</option>
-                     <option value="completed">已完成</option>
-                     <option value="failed">失败</option>
-                     <option value="cancelled">已取消</option>
-                 </select>
-                 <input type="text" class="form-input" id="searchTask" placeholder="搜索任务 ID..." style="padding-left: 36px;" onkeyup="searchTasksDebounced()">
-                 <svg class="icon" style="position: absolute; left: 10px; top: 10px; color: #9ca3af;" viewBox="0 0 24 24">
-                     <path d="M21 21l-6 6m-6-6h13v13h-13l6 6-6zM10.5 13a8 8 0 018 0 8-4 4 0 0-8zM21 12.6a9 9 0 011-12.5 9.6 0 0-6 12.5-12.5 12.5 0 0-6 0-6 6z" />
-                 </svg>
-             </div>
-             <div class="data-grid">
-                 <div id="tasksTableBody"></div>
-                 <div class="pagination-controls" id="pagination">
-                     <button class="btn btn-secondary btn-sm" onclick="prevPage()">
-                         <svg class="icon" viewBox="0 0 24 24">
-                             <path d="M15.41 7.41L10.59 14.59 6 6 1.41-1.41 6 6l-6 6 6 6 1.41 1.41 14.59 10.59 15.41 7.41 6 1.41 1.41-6 6l6 6 6 1.41 1.41-1.41z" />
-                         </svg>
-                     上一页
-                     </button>
-                     <span class="page-info" id="pageInfo">第 1 / 1 页</span>
-                     <button class="btn btn-secondary btn-sm" onclick="nextPage()">
-                         <svg class="icon" viewBox="pagination-controls" viewBox="0 0 24 24">
-                             <path d="M8.59 14.59l-6-6 6 6-6-6 1.41 1.41-1.41 6 6 6 6 6 1.41 14.59 10.59 15.41 7.41 1.41 6 6l6 6 6 1.41 1.41-1.41z" />
-                         </svg>
-                         下一页
-                     </button>
-                     <select id="pageSizeSelect" class="form-select" onchange="changePageSize()">
-                         <option value="10">10 / 页</option>
-                         <option value="20">20 / 页</option>
-                         <option value="50">50 / 页</option>
-                     </select>
+                  </button>
+              </div>
+          </div>
+
+         <!-- 创建定时任务模态框 -->
+         <div id="createScheduledTaskModal" class="modal">
+             <div class="modal-content">
+                 <div class="modal-header">创建定时任务</div>
+                 <div class="modal-body">
+                     <form id="createScheduledTaskForm" onsubmit="createScheduledTask(event)">
+                         <div class="form-section">
+                             <div class="form-section-title">
+                                 <span>基本信息</span>
+                             </div>
+                             <div class="config-pane" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                 <div class="form-group">
+                                     <label class="form-label">任务名称 *</label>
+                                     <input type="text" id="scheduledName" class="form-input" required placeholder="例如：每日镜像预热">
+                                 </div>
+                                 <div class="form-group">
+                                     <label class="form-label">启用任务</label>
+                                     <select id="scheduledEnabled" class="form-input">
+                                         <option value="true">是</option>
+                                         <option value="false">否</option>
+                                     </select>
+                                 </div>
+                             </div>
+                         </div>
+
+                         <div class="form-section">
+                             <div class="form-section-title">
+                                 <span>Cron 表达式</span>
+                             </div>
+                             <div class="config-pane">
+                                 <div class="form-group">
+                                     <label class="form-label">Cron 表达式 *</label>
+                                     <div style="display: flex; gap: 12px;">
+                                         <input type="text" id="scheduledCron" class="form-input" required placeholder="0 2 * * *" style="font-family: monospace; flex: 1;">
+                                         <select id="cronTemplate" class="form-input" style="flex: 0 0 auto; min-width: 220px;" onchange="applyCronTemplate()">
+                                             <option value="">-- 选择模板 --</option>
+                                             <option value="0 2 * * *">每天凌晨2点</option>
+                                             <option value="0 * * * *">每小时执行</option>
+                                             <option value="0 9 * * 1">每周一上午9点</option>
+                                             <option value="*/15 * * * *">每15分钟</option>
+                                             <option value="0 0 * * *">每天午夜</option>
+                                             <option value="0 */2 * * *">每2小时</option>
+                                         </select>
+                                     </div>
+                                     <div id="nextExecutionPreview" style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;"></div>
+                                 </div>
+                             </div>
+                         </div>
+
+                         <div class="form-section">
+                             <div class="form-section-title">
+                                 <span>任务配置</span>
+                             </div>
+                             <div class="config-pane" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                 <div class="form-group">
+                                     <label class="form-label">镜像列表 *</label>
+                                     <textarea id="scheduledImages" class="form-input" rows="4" required placeholder="docker.io/library/nginx:latest, docker.io/library/redis:7" style="font-family: monospace;"></textarea>
+                                     <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">多个镜像用逗号分隔</div>
+                                 </div>
+                                 <div class="form-group">
+                                     <label class="form-label">批次大小</label>
+                                     <input type="number" id="scheduledBatchSize" class="form-input" value="10" min="1" max="100">
+                                 </div>
+                             </div>
+                         </div>
+
+                         <div class="form-section">
+                             <div class="form-section-title">
+                                 <span>高级配置</span>
+                             </div>
+                             <div class="config-pane" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                                 <div class="form-group">
+                                     <label class="form-label">重叠策略</label>
+                                     <select id="scheduledOverlap" class="form-input">
+                                         <option value="skip">跳过（不执行）</option>
+                                         <option value="allow">允许（排队）</option>
+                                     </select>
+                                 </div>
+                                 <div class="form-group">
+                                     <label class="form-label">超时时间（秒，0表示不限制）</label>
+                                     <input type="number" id="scheduledTimeout" class="form-input" value="0" min="0" max="86400">
+                                 </div>
+                             </div>
+                         </div>
+                     </form>
+                 </div>
+                 <div class="form-actions">
+                     <button type="button" class="btn btn-secondary" onclick="hideCreateScheduledTaskModal()">取消</button>
+                     <button type="button" class="btn btn-primary" onclick="document.getElementById('createScheduledTaskForm').requestSubmit()">创建任务</button>
                  </div>
              </div>
          </div>
-         <!-- 定时任务面板 -->
-         <div id="scheduledTasksPanel" class="tab-panel">
-             <div class="action-bar">
-                 <button class="btn btn-primary" onclick="showCreateScheduledTaskModal()">
-                     <svg class="icon" viewBox="0 0 24 24">
-                         <path d="M12 4.5v15m7.5-7.5-7.5 19 0 1.414 1.414L19 12l-4.243-4.243a5 5 5 0 0 5 5 0 5z" />
-                     </svg>
-                     新建定时任务
-                 </button>
-             </div>
-             <div class="filter-bar">
-                 <select id="scheduledFilter" class="form-select" onchange="filterScheduledTasks()">
-                     <option value="">全部</option>
-                     <option value="enabled">已启用</option>
-                     <option value="disabled">已禁用</option>
-                 </select>
-             </div>
-             <div class="data-grid">
-                 <div id="scheduledTasksTableBody"></div>
-                 <div class="pagination-controls" id="scheduledPagination">
-                     <button class="btn btn-secondary btn-sm" onclick="prevScheduledPage()">
-                         <svg class="icon" viewBox="0 0 24 24">
-                             <path d="M15.41 7.41L10.59 14.59 6 6 1.41-1.41 6 6l-6 6 6 6 1.41 14.59 10.59 15.41 7.41 1.41 6 6l6 6 6 1.41-1.41z" />
-                         </svg>
-                         上一页
-                     </button>
-                     <span class="page-info" id="scheduledPageInfo">第 1 / 1 页</span>
-                     <button class="btn btn-secondary btn-sm" onclick="nextScheduledPage()">
-                         <svg class="icon" viewBox="0 0 24 24">
-                             <path d="M8.59 14.59l-6-6 6 6-6 1.41-1.41 6 6l6 6 6 6 1.41 14.59 10.59 15.41 7.41 1.41 6 6l6 6 6 1.41-1.41z" />
-                         </svg>
-                         下一页
-                     </button>
-                     <select id="scheduledPageSizeSelect" class="form-select" onchange="changeScheduledPageSize()">
-                         <option value="10">10 / 页</option>
-                         <option value="20">20 / 页</option>
-                         <option value="50">50 / 页</option>
-                     </select>
-                 </div>
-             </div>
-         </div>
+
          <!-- 镜像库面板 -->
         <div id="libraryPanel" class="tab-panel" style="display: none;">
             <div class="action-bar">
