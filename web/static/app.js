@@ -3,29 +3,33 @@ const API_BASE = '/api/v1';
 
 // Global State
 let state = {
-    tasks: [],
-    pagination: {
-        page: 1,
-        pageSize: 10,
-        total: 0
-    },
-    selectedTasks: new Set(),
-    filter: {
-        status: '',
-        search: ''
-    },
-    user: null,
-    currentTaskId: null,
-    refreshInterval: null,
-    debounceTimer: null,
-    confirmCallback: null,
-    library: [],
-    libraryPagination: { page: 1, pageSize: 10, total: 0 },
-    selectedLibImages: new Set(),
-    secrets: [],
-    secretPagination: { page: 1, pageSize: 10, total: 0 },
-    selectedSecrets: new Set()
-};
+     tasks: [],
+     pagination: {
+         page: 1,
+         pageSize: 10,
+         total: 0
+     },
+     selectedTasks: new Set(),
+     filter: {
+         status: '',
+         search: ''
+     },
+     user: null,
+     currentTaskId: null,
+     refreshInterval: null,
+     debounceTimer: null,
+     confirmCallback: null,
+     library: [],
+     libraryPagination: { page: 1, pageSize: 10, total: 0 },
+     selectedLibImages: new Set(),
+     secrets: [],
+     secretPagination: { page: 1, pageSize: 10, total: 0 },
+     selectedSecrets: new Set(),
+     scheduledTasks: [],
+     scheduledPagination: { page: 1, pageSize: 10, total: 0 },
+     selectedScheduledTasks: new Set(),
+     scheduledFilter: { enabled: '' }
+ };
 
 // --- Toast Factory ---
 function showToast(message, type = 'success') {
@@ -81,14 +85,134 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function initApp() {
     loadUser();
-    refreshTasks();
+    refreshDashboard();
 
-    // Auto-refresh every 5s if on tasks panel
     state.refreshInterval = setInterval(() => {
-        if (document.getElementById('tasksPanel').style.display !== 'none' && !document.getElementById('detailModal').classList.contains('show')) {
-            refreshTasks(true); // silent refresh
+        const tasksPanel = document.getElementById('tasksPanel');
+        const dashboardPanel = document.getElementById('dashboardPanel');
+        const isDetailModalOpen = document.getElementById('detailModal').classList.contains('show');
+
+        if (isDetailModalOpen) return;
+
+        if (dashboardPanel && dashboardPanel.style.display !== 'none') {
+            refreshDashboard(true);
+        } else if (tasksPanel && tasksPanel.style.display !== 'none') {
+            refreshTasks(true);
         }
     }, 5000);
+}
+
+async function refreshDashboard(silent = false) {
+    try {
+        await Promise.all([
+            refreshDashboardStats(silent),
+            refreshRecentTasks(silent)
+        ]);
+    } catch (error) {
+        console.error('Failed to refresh dashboard:', error);
+        if (!silent) showToast('加载Dashboard失败', 'error');
+    }
+}
+
+async function refreshDashboardStats(silent = false) {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/tasks?limit=1000`);
+        const data = await response.json();
+        const tasks = data.tasks || [];
+
+        const runningTasks = tasks.filter(t => t.status === 'running').length;
+        const pendingTasks = tasks.filter(t => t.status === 'pending').length;
+
+        const today = new Date().toDateString();
+        const todayTasks = tasks.filter(t => new Date(t.createdAt).toDateString() === today);
+        const completedTasks = todayTasks.filter(t => t.status === 'completed').length;
+        const successRate = todayTasks.length > 0 ? Math.round((completedTasks / todayTasks.length) * 100) : 100;
+
+        document.getElementById('statRunningTasks').textContent = runningTasks + pendingTasks;
+        document.getElementById('statSuccessRate').textContent = successRate + '%';
+
+        const trend = document.getElementById('statTrend');
+        const trendText = document.getElementById('statTrendText');
+        if (todayTasks.length >= 2) {
+            trend.className = 'stat-trend';
+            trendText.textContent = '良好';
+        } else if (todayTasks.length === 1) {
+            trend.className = 'stat-trend neutral';
+            trendText.textContent = '--';
+        } else {
+            trend.className = 'stat-trend neutral';
+            trendText.textContent = '暂无数据';
+        }
+
+        const scheduledResponse = await fetchWithAuth(`${API_BASE}/scheduled-tasks`);
+        const scheduledData = await scheduledResponse.json();
+        const scheduledTasks = scheduledData.tasks || [];
+        const activeScheduled = scheduledTasks.filter(t => t.enabled).length;
+        document.getElementById('statScheduled').textContent = scheduledTasks.length;
+        document.getElementById('statScheduledActive').textContent = activeScheduled;
+
+        document.getElementById('statNodes').textContent = 'N/A';
+
+    } catch (error) {
+        console.error('Failed to refresh dashboard stats:', error);
+    }
+}
+
+async function refreshRecentTasks(silent = false) {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/tasks?limit=5&offset=0`);
+        const data = await response.json();
+        const tasks = data.tasks || [];
+
+        const container = document.getElementById('recentTasksList');
+
+        if (tasks.length === 0) {
+            container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 60px 0;">暂无任务记录</div>';
+            return;
+        }
+
+        container.innerHTML = `
+            <table class="data-grid" style="width: 100%;">
+                <thead>
+                    <tr>
+                        <th>状态</th>
+                        <th>任务 ID</th>
+                        <th>镜像</th>
+                        <th>进度</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${tasks.map(task => `
+                        <tr class="task-row" style="cursor: pointer;" onclick="showTaskDetail('${task.taskId}')">
+                            <td><span class="status-badge bg-${task.status}">${getStatusText(task.status)}</span></td>
+                            <td style="font-family: monospace; font-weight: 500;">${task.taskId}</td>
+                            <td>
+                                <div style="font-size: 13px; font-weight: 500; color: #111827;">${task.images[0]}</div>
+                                ${task.images.length > 1 ? `<div style="font-size: 11px; color: #6b7280;">+${task.images.length - 1} 个更多</div>` : ''}
+                            </td>
+                            <td>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <div class="progress-bar" style="width: 80px;">
+                                        <div class="progress-fill" style="width: ${task.progress ? task.progress.percentage : 0}%"></div>
+                                    </div>
+                                    <span style="font-size: 12px; color: #6b7280;">${task.progress ? Math.round(task.progress.percentage) : 0}%</span>
+                                </div>
+                            </td>
+                            <td style="color: #6b7280;">${formatTime(task.createdAt)}</td>
+                            <td onclick="event.stopPropagation()">
+                                <button class="btn btn-secondary btn-sm" onclick="showTaskDetail('${task.taskId}')">详情</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    } catch (error) {
+        console.error('Failed to refresh recent tasks:', error);
+        if (!silent) showToast('加载最近任务失败', 'error');
+    }
 }
 
 // Authentication
@@ -98,6 +222,197 @@ function checkAuth() {
         showLogin();
         return false;
     }
+    return true;
+}
+
+async function renderScheduledTasks() {
+    const tbody = document.getElementById('scheduledTasksTableBody');
+    tbody.innerHTML = '';
+    
+    if (state.scheduledTasks.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#6b7280; padding: 40px;">暂无定时任务</td></tr>';
+        return;
+    }
+    
+    const start = (state.scheduledPagination.page - 1) * state.scheduledPagination.pageSize;
+    const end = Math.min(start + state.scheduledPagination.pageSize, state.scheduledTasks.length);
+    const displayTasks = state.scheduledTasks.slice(start, end);
+    
+    displayTasks.forEach(task => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${task.id}</td>
+            <td>${task.name}</td>
+            <td>${task.cronExpr}</td>
+            <td><span class="status-badge bg-${task.enabled ? 'enabled' : 'disabled'}">${task.enabled ? '已启用' : '已禁用'}</span></td>
+            <td>${task.overlapPolicy}</td>
+            <td>${task.enabled ? '<button class="btn btn-sm btn-secondary" onclick="disableScheduledTask(\''${task.id}'\')">禁用</button>' : '<button class="btn btn-sm btn-secondary" onclick="enableScheduledTask(\''${task.id}'\')">启用</button>'}</td>
+            <td>
+                <button class="btn btn-sm btn-primary" onclick="triggerScheduledTask(\''${task.id}'\')">触发</button>
+                <button class="btn btn-sm btn-danger" onclick="deleteScheduledTask(\''${task.id}'\')">删除</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+    
+    // Update pagination info
+    document.getElementById('scheduledPageStart').innerText = start + 1;
+    document.getElementById('scheduledPageEnd').innerText = end;
+    document.getElementById('scheduledTotalItems').innerText = state.scheduledPagination.total;
+}
+
+async function prevScheduledPage() {
+    if (state.scheduledPagination.page > 1) {
+        state.scheduledPagination.page--;
+        refreshScheduledTasks();
+    }
+}
+
+async function nextScheduledPage() {
+    const { page, pageSize, total } = state.scheduledPagination;
+    if (page * pageSize < total) {
+        state.scheduledPagination.page++;
+        refreshScheduledTasks();
+    }
+}
+
+async function changeScheduledPageSize() {
+    const size = parseInt(document.getElementById('scheduledPageSizeSelect').value);
+    state.scheduledPagination.pageSize = size;
+    state.scheduledPagination.page = 1;
+    refreshScheduledTasks();
+}
+
+async function createScheduledTask(event) {
+    event.preventDefault();
+    
+    const name = document.getElementById('scheduledName').value.trim();
+    const cronExpr = document.getElementById('scheduledCron').value.trim();
+    const images = document.getElementById('scheduledImages').value.trim().split(',').map(s => s.trim());
+    const enabled = document.getElementById('scheduledEnabled').checked;
+    const overlapPolicy = document.getElementById('scheduledOverlap').value;
+    const timeout = parseInt(document.getElementById('scheduledTimeout').value) || 0;
+    const batchSize = parseInt(document.getElementById('scheduledBatchSize').value) || 10;
+    
+    if (!name || !cronExpr || images.length === 0) {
+        showToast('请填写必填字段', 'error');
+        return;
+    }
+    
+    if (!cronExpr.match(/^(\S+\s+\s+\s+\s+\s+\d+)$/)) {
+        showToast('无效的 Cron 表达式', 'error');
+        return;
+    }
+    
+    const task = {
+        name,
+        description: '',
+        cronExpr,
+        enabled,
+        taskConfig: {
+            images,
+            batchSize,
+            priority: 1
+        },
+        overlapPolicy,
+        timeoutSeconds: timeout
+    };
+    
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/scheduled-tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(task)
+        });
+        
+        await response.json();
+        showToast('定时任务创建成功', 'success');
+        hideCreateScheduledTaskModal();
+        refreshScheduledTasks();
+    } catch (error) {
+        console.error('Failed to create scheduled task:', error);
+        showToast('创建定时任务失败', 'error');
+    }
+}
+
+async function enableScheduledTask(id) {
+    try {
+        await fetchWithAuth(`${API_BASE}/scheduled-tasks/${id}/enable`, { method: 'PUT' });
+        showToast('定时任务已启用', 'success');
+        refreshScheduledTasks();
+    } catch (error) {
+        console.error('Failed to enable scheduled task:', error);
+        showToast('启用定时任务失败', 'error');
+    }
+}
+
+async function disableScheduledTask(id) {
+    try {
+        await fetchWithAuth(`${API_BASE}/scheduled-tasks/${id}/disable`, { method: 'PUT' });
+        showToast('定时任务已禁用', 'success');
+        refreshScheduledTasks();
+    } catch (error) {
+        console.error('Failed to disable scheduled task:', error);
+        showToast('禁用定时任务失败', 'error');
+    }
+}
+
+async function triggerScheduledTask(id) {
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/scheduled-tasks/${id}/trigger`, { method: 'POST' });
+        showToast('定时任务已触发', 'success');
+    } catch (error) {
+        console.error('Failed to trigger scheduled task:', error);
+        showToast('触发定时任务失败', 'error');
+    }
+}
+
+async function deleteScheduledTask(id) {
+    if (!confirm('确定要删除这个定时任务吗？')) {
+        return;
+    }
+    
+    try {
+        await fetchWithAuth(`${API_BASE}/scheduled-tasks/${id}`, { method: 'DELETE' });
+        showToast('定时任务已删除', 'success');
+        refreshScheduledTasks();
+    } catch (error) {
+        console.error('Failed to delete scheduled task:', error);
+        showToast('删除定时任务失败', 'error');
+    }
+}
+
+function showCreateScheduledTaskModal() {
+    document.getElementById('createScheduledTaskModal').classList.add('show');
+}
+
+function hideCreateScheduledTaskModal() {
+    document.getElementById('createScheduledTaskModal').classList.remove('show');
+    document.getElementById('createScheduledTaskModal').classList.remove('active');
+}
+    } catch (error) {
+        console.error('Failed to load tasks:', error);
+        showToast('加载任务失败', 'error');
+    }
+}
+
+async function refreshScheduledTasks(silent = false) {
+    if (!checkAuth()) return;
+    try {
+        const response = await fetchWithAuth(`${API_BASE}/scheduled-tasks?enabled=${state.scheduledFilter.enabled}&offset=${(state.scheduledPagination.page - 1) * state.scheduledPagination.pageSize}&limit=${state.scheduledPagination.pageSize}`);
+        const data = await response.json();
+        state.scheduledTasks = data.tasks;
+        state.scheduledPagination.total = data.total;
+        renderScheduledTasks();
+        
+        if (!silent) {
+            showToast(`成功加载 ${data.tasks.length} 个定时任务`, 'success');
+        }
+    } catch (error) {
+        console.error('Failed to load scheduled tasks:', error);
+        showToast('加载定时任务失败', 'error');
+    }
+}
     hideLogin();
     return true;
 }
@@ -665,26 +980,30 @@ async function deleteUser(id) {
 
 // Tabs & Modals
 function switchTab(tab) {
-    document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
-    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    const tabs = document.querySelectorAll('.nav-link');
+    tabs.forEach(t => {
+        t.classList.remove('active');
+        if (t.getAttribute('onclick')?.includes(`'${tab}'`)) {
+            t.classList.add('active');
+        }
+    });
 
-    if (tab === 'tasks') {
-        document.getElementById('tasksPanel').style.display = 'block';
-        document.querySelectorAll('a[onclick="switchTab(\'tasks\')"]').forEach(e => e.classList.add('active'));
-        refreshTasks();
-    } else if (tab === 'library') {
-        document.getElementById('libraryPanel').style.display = 'block';
-        document.querySelectorAll('a[onclick="switchTab(\'library\')"]').forEach(e => e.classList.add('active'));
-        refreshLibrary();
-    } else if (tab === 'secrets') {
-        document.getElementById('secretsPanel').style.display = 'block';
-        document.querySelectorAll('a[onclick="switchTab(\'secrets\')"]').forEach(e => e.classList.add('active'));
-        refreshSecrets();
-    } else if (tab === 'admin') {
-        document.getElementById('adminPanel').style.display = 'block';
-        document.getElementById('adminTab').classList.add('active');
-        refreshUsers();
+    const panels = document.querySelectorAll('.tab-panel');
+    panels.forEach(p => p.classList.remove('active'));
+    const activePanel = document.getElementById(`${tab}Panel`);
+    if (activePanel) activePanel.classList.add('active');
+
+    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
+    if (batchDeleteBtn) {
+        batchDeleteBtn.style.display = tab === 'tasks' ? 'none' : 'block';
     }
+
+    if (tab === 'dashboard') {
+        refreshDashboard();
+    } else if (tab === 'tasks' && state.tasks.length === 0) {
+        refreshTasks();
+    }
+}
 }
 
 function showCreateTaskModal() {
