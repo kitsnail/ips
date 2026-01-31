@@ -31,7 +31,7 @@ func (h *SecretHandler) ListSecrets(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"data":     secrets,
+		"secrets":  secrets,
 		"total":    total,
 		"page":     page,
 		"pageSize": pageSize,

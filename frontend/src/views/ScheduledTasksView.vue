@@ -9,6 +9,9 @@ const scheduledTasks = ref<ScheduledTask[]>([])
 const showCreateModal = ref(false)
 let refreshInterval: number | null = null
 
+// Use separate field for textarea input
+const imagesInput = ref('')
+
 const form = ref<CreateScheduledTaskRequest>({
   name: '',
   description: '',
@@ -41,9 +44,29 @@ const loadScheduledTasks = async () => {
 
 const handleCreate = async () => {
   try {
-    await scheduledTaskApi.create(form.value)
+    // Convert textarea images (string) to array
+    const imagesArray = imagesInput.value
+      .split('\n')
+      .map(img => img.trim())
+      .filter(img => img.length > 0)
+
+    if (imagesArray.length === 0) {
+      ElMessage.warning('请至少输入一个镜像地址')
+      return
+    }
+
+    const requestData = {
+      ...form.value,
+      taskConfig: {
+        ...form.value.taskConfig,
+        images: imagesArray
+      }
+    }
+    await scheduledTaskApi.create(requestData)
     ElMessage.success('定时任务创建成功')
     showCreateModal.value = false
+    imagesInput.value = ''
+    resetForm()
     loadScheduledTasks()
   } catch (error) {
     ElMessage.error('创建定时任务失败')
@@ -107,6 +130,7 @@ const resetForm = () => {
     overlapPolicy: 'skip',
     timeoutSeconds: 0,
   }
+  imagesInput.value = ''
 }
 
 onMounted(() => {
@@ -166,7 +190,8 @@ onUnmounted(() => {
     </el-table>
 
     <el-dialog
-      v-model="showCreateModal"
+      :model-value="showCreateModal"
+      @update:model-value="(val: boolean) => showCreateModal = val"
       title="创建定时任务"
       width="700px"
       @close="resetForm"
@@ -183,7 +208,7 @@ onUnmounted(() => {
         </el-form-item>
         <el-form-item label="镜像列表" required>
           <el-input
-            v-model="form.taskConfig.images"
+            v-model="imagesInput"
             type="textarea"
             :rows="4"
             placeholder="每行一个镜像地址"

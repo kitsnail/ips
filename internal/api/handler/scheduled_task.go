@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -51,12 +52,22 @@ func (h *ScheduledTaskHandler) CreateScheduledTask(c *gin.Context) {
 		CreatedBy:      c.GetString("username"),
 	}
 
-	if err := h.scheduledTaskManager.AddTask(task); err != nil {
+	if err := h.scheduledTaskManager.CreateScheduledTask(context.Background(), task); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "Failed to create scheduled task",
+			"error":   "Failed to create scheduled task in database",
 			"details": err.Error(),
 		})
 		return
+	}
+
+	if task.Enabled {
+		if err := h.scheduledTaskManager.AddTask(task); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "Failed to add scheduled task to scheduler",
+				"details": err.Error(),
+			})
+			return
+		}
 	}
 
 	c.JSON(http.StatusCreated, task)

@@ -22,9 +22,27 @@ func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, schedu
 	router.Use(middleware.PrometheusMiddleware())
 
 	// 静态文件服务 (Web UI)
-	router.Static("/web", "./web/static")
+	router.Static("/web/assets", "./web/static/dist/assets")
+	router.GET("/web/vite.svg", func(c *gin.Context) {
+		c.File("./web/static/dist/vite.svg")
+	})
+	router.GET("/web/vite.svg/", func(c *gin.Context) {
+		c.File("./web/static/dist/vite.svg")
+	})
 	router.GET("/", func(c *gin.Context) {
 		c.Redirect(302, "/web/")
+	})
+
+	// SPA catch-all: 使用 NoRoute 处理器避免 Gin 路由冲突
+	router.NoRoute(func(c *gin.Context) {
+		path := c.Request.URL.Path
+		// /web/ 下的所有路径都返回 index.html（包括前端虚拟路由）
+		if path == "/web" || path == "/web/" || len(path) > 4 && path[:4] == "/web" {
+			c.File("./web/static/dist/index.html")
+			return
+		}
+		// 其他路径返回 404
+		c.JSON(404, gin.H{"error": "Not Found"})
 	})
 
 	// 健康检查处理器

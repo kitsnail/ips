@@ -26,7 +26,7 @@ RUN addgroup -g 1000 ips && \
 WORKDIR /app
 
 # 从 frontend-builder 阶段复制构建产物
-COPY --from=frontend-builder /app/frontend/dist /app/web/dist
+COPY --from=frontend-builder /app/web/static/dist /app/web/static
 
 # 从宿主机复制二进制文件 (必须预先 build)
 COPY bin/apiserver /app/apiserver

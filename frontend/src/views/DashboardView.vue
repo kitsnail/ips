@@ -23,8 +23,8 @@ const refreshDashboardStats = async () => {
       scheduledTaskApi.list({ limit: 100 }),
     ])
 
-    const tasks = tasksResponse.tasks
-    const scheduled = scheduledResponse.tasks
+    const tasks = tasksResponse?.tasks || []
+    const scheduled = scheduledResponse?.tasks || []
 
     const running = tasks.filter((t) => t.status === 'running').length
     const pending = tasks.filter((t) => t.status === 'pending').length
@@ -40,6 +40,7 @@ const refreshDashboardStats = async () => {
 
     recentTasks.value = tasks.slice(0, 5)
   } catch (error) {
+    console.error('Dashboard loading error:', error)
     ElMessage.error('加载Dashboard失败')
   } finally {
     loading.value = false

@@ -27,10 +27,10 @@ type ScheduledTaskManager struct {
 	cronScheduler  *cron.Cron
 	mu             sync.RWMutex
 	cronEntries    map[string]cron.EntryID
+	executingTasks map[string]bool
+	taskQueue      map[string][]string
 	ctx            context.Context
 	cancel         context.CancelFunc
-	executingTasks map[string]bool
-	taskQueue      map[string][]string // scheduledTaskID -> queue of pending execution requests
 }
 
 func NewScheduledTaskManager(
@@ -206,6 +206,10 @@ func (m *ScheduledTaskManager) GetScheduledTask(ctx context.Context, taskID stri
 	return m.scheduledTaskRepo.GetScheduledTask(ctx, taskID)
 }
 
+func (m *ScheduledTaskManager) CreateScheduledTask(ctx context.Context, task *models.ScheduledTask) error {
+	return m.scheduledTaskRepo.CreateScheduledTask(ctx, task)
+}
+
 func (m *ScheduledTaskManager) ListScheduledTasks(ctx context.Context, offset, limit int) ([]*models.ScheduledTask, int, error) {
 	return m.scheduledTaskRepo.ListScheduledTasks(ctx, offset, limit)
 }
@@ -224,11 +228,12 @@ func (m *ScheduledTaskManager) isPreviousTaskRunning(scheduledTaskID string) boo
 		return false
 	}
 
-	m.mu.RLock()
-	isRunning := m.executingTasks[scheduledTaskID]
-	m.mu.RUnlock()
+	m.logger.WithFields(logrus.Fields{
+		"scheduledTaskId":   scheduledTaskID,
+		"runningExecutions": len(executions),
+	}).Debug("Checking if previous task is running")
 
-	if isRunning || len(executions) > 0 {
+	if len(executions) > 0 {
 		return true
 	}
 	return false

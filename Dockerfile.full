@@ -57,7 +57,7 @@ WORKDIR /app
 
 # 从构建阶段复制文件
 COPY --from=backend-builder /app/apiserver /app/apiserver
-COPY --from=frontend-builder /app/frontend/dist /app/web/dist
+COPY --from=frontend-builder /app/web/static/dist /app/web/static
 COPY scripts/crictl /usr/local/bin/crictl
 
 # 修改文件权限

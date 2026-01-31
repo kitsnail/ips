@@ -1,21 +1,17 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { authApi } from '@/services/api'
 
-const router = useRouter()
-
 const username = ref('')
 const password = ref('')
-const isLoggedIn = ref(!!window.localStorage.getItem('ips_token'))
+const isLoggedIn = computed(() => !!window.localStorage.getItem('ips_token'))
 
 const login = async () => {
   try {
     await authApi.login({ username: username.value, password: password.value })
     ElMessage.success('登录成功')
-    isLoggedIn.value = true
-    router.push('/dashboard')
+    window.location.href = '/web/dashboard'
   } catch (error) {
     ElMessage.error('登录失败，请检查用户名和密码')
   }

@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { taskApi } from '@/services/api'
 import type { Task } from '@/types/api'
 import TaskDetailModal from '@/components/TaskDetailModal.vue'
+import CreateTaskModal from '@/components/CreateTaskModal.vue'
 
 const tasks = ref<Task[]>([])
 const loading = ref(false)
 const showCreateModal = ref(false)
 const showDetailModal = ref(false)
 const selectedTask = ref<Task | null>(null)
+const createModalRef = ref<InstanceType<typeof CreateTaskModal> | null>(null)
 let refreshInterval: number | null = null
 
 const refreshTasks = async () => {
@@ -27,6 +29,13 @@ const refreshTasks = async () => {
 const handleCreateSuccess = () => {
   refreshTasks()
 }
+
+// Watch showCreateModal to call handleOpen when it opens
+watch(showCreateModal, (newVal) => {
+  if (newVal && createModalRef.value) {
+    createModalRef.value.handleOpen()
+  }
+})
 
 const showTaskDetail = (task: Task) => {
   selectedTask.value = task

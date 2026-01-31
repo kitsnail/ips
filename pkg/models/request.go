@@ -19,8 +19,8 @@ type CreateTaskRequest struct {
 // ListTasksRequest 列表查询请求
 type ListTasksRequest struct {
 	Status string `form:"status"`
-	Limit  int    `form:"limit" binding:"omitempty,min=1,max=100"`
-	Offset int    `form:"offset" binding:"omitempty,min=0"`
+	Limit  int    `form:"limit"`
+	Offset int    `form:"offset"`
 }
 
 // TaskFilter 任务过滤条件

@@ -66,17 +66,21 @@ const handleClose = () => {
   emit('update:visible', false)
 }
 
-const handleImageToggle = (imageId: number) => {
-  const index = selectedLibraryImages.value.indexOf(imageId)
-  if (index > -1) {
-    selectedLibraryImages.value.splice(index, 1)
-  } else {
-    selectedLibraryImages.value.push(imageId)
-  }
-}
-
 const submit = async () => {
   try {
+    // Convert selected image IDs to image URLs
+    const selectedImages = selectedLibraryImages.value
+      .map(id => libraryImages.value.find(img => img.id === id)?.image)
+      .filter((img): img is string => !!img)
+
+    if (selectedImages.length === 0) {
+      ElMessage.warning('请至少选择一个镜像')
+      return
+    }
+
+    // Update form with selected images
+    form.value.images = selectedImages
+
     loading.value = true
     await taskApi.create(form.value)
     ElMessage.success('任务创建成功')
@@ -111,7 +115,6 @@ defineExpose({
               :key="img.id"
               :label="img.id"
               border
-              @change="handleImageToggle(img.id)"
             >
               <div class="image-item">
                 <div class="image-name">{{ img.name }}</div>
@@ -130,7 +133,10 @@ defineExpose({
             v-for="imgId in selectedLibraryImages"
             :key="imgId"
             closable
-            @close="handleImageToggle(imgId)"
+            @close="() => {
+              const index = selectedLibraryImages.indexOf(imgId)
+              if (index > -1) selectedLibraryImages.splice(index, 1)
+            }"
           >
             {{ libraryImages.find((i) => i.id === imgId)?.name }}
           </el-tag>
