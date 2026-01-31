@@ -37,19 +37,22 @@ function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
 
-    // Icon based on type
+    const iconColors = {
+        'success': 'var(--success-color)',
+        'error': 'var(--error-color)',
+        'info': 'var(--primary-color)'
+    };
+
     let icon = '';
-    if (type === 'success') icon = '<svg class="icon" style="color:#10b981" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>';
-    else if (type === 'error') icon = '<svg class="icon" style="color:#ef4444" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>';
-    else icon = '<svg class="icon" style="color:#3b82f6" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
+    if (type === 'success') icon = '<svg class="icon" style="color:var(--success-color)" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>';
+    else if (type === 'error') icon = '<svg class="icon" style="color:var(--error-color)" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12"/></svg>';
+    else icon = '<svg class="icon" style="color:var(--primary-color)" viewBox="0 0 24 24"><path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>';
 
     toast.innerHTML = `${icon}<span>${message}</span>`;
     container.appendChild(toast);
 
-    // Auto remove
     setTimeout(() => {
-        toast.style.opacity = '0';
-        toast.style.transform = 'translateX(100%)';
+        toast.classList.add('toast-leave');
         setTimeout(() => toast.remove(), 300);
     }, 3000);
 }
@@ -77,6 +80,50 @@ function hideConfirmModal() {
 }
 
 // Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    if (checkAuth()) {
+        initApp();
+        initKeyboardShortcuts();
+    }
+});
+
+function initKeyboardShortcuts() {
+    document.addEventListener('keydown', (e) => {
+        const activeElement = document.activeElement;
+        const isInputFocused = activeElement && (
+            activeElement.tagName === 'INPUT' ||
+            activeElement.tagName === 'TEXTAREA' ||
+            activeElement.isContentEditable
+        );
+
+        if (isInputFocused) return;
+
+        const key = e.key.toLowerCase();
+
+        if (key === 'n' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            if (!document.getElementById('createModal').classList.contains('show')) {
+                showCreateTaskModal();
+            }
+        } else if (key === 'f' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            const searchInput = document.getElementById('searchTask');
+            if (searchInput) {
+                searchInput.focus();
+            }
+        } else if (key === 'escape') {
+            closeAllModals();
+        }
+    });
+}
+
+function closeAllModals() {
+    const modals = document.querySelectorAll('.modal.show');
+    modals.forEach(modal => {
+        modal.classList.remove('show');
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     if (checkAuth()) {
         initApp();
@@ -133,7 +180,7 @@ async function refreshDashboardStats(silent = false) {
 
         const trend = document.getElementById('statTrend');
         const trendText = document.getElementById('statTrendText');
-        if (todayTasks.length >= 2) {
+            if (todayTasks.length >= 2) {
             trend.className = 'stat-trend';
             trendText.textContent = '良好';
         } else if (todayTasks.length === 1) {
@@ -141,7 +188,7 @@ async function refreshDashboardStats(silent = false) {
             trendText.textContent = '--';
         } else {
             trend.className = 'stat-trend neutral';
-            trendText.textContent = '暂无数据';
+            trendText.textContent = '加载中...';
         }
 
         const scheduledResponse = await fetchWithAuth(`${API_BASE}/scheduled-tasks`);
@@ -167,7 +214,7 @@ async function refreshRecentTasks(silent = false) {
         const container = document.getElementById('recentTasksList');
 
         if (tasks.length === 0) {
-            container.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 60px 0;">暂无任务记录</div>';
+            container.innerHTML = renderSkeleton(5);
             return;
         }
 
@@ -670,6 +717,19 @@ async function refreshTasks(silent = false) {
     }
 }
 
+function renderSkeleton(rows = 6) {
+    return Array(rows).fill().map(() => `
+        <tr>
+            <td class="col-checkbox" style="visibility: hidden;"><div class="skeleton skeleton-text" style="width: 16px;"></div></td>
+            <td><div class="skeleton skeleton-text" style="width: 120px;"></div></td>
+            <td><div class="skeleton skeleton-text" style="width: 80px;"></div></td>
+            <td><div class="skeleton skeleton-text" style="width: 60px;"></div></td>
+            <td><div class="skeleton skeleton-text" style="width: 100px;"></div></td>
+            <td><div class="skeleton skeleton-text" style="width: 80px;"></div></td>
+        </tr>
+    `).join('');
+}
+
 function renderTasks() {
     const tbody = document.getElementById('taskListBody');
     const tasks = state.tasks;
@@ -682,7 +742,7 @@ function renderTasks() {
     });
 
     if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">暂无任务</td></tr>';
+        tbody.innerHTML = renderSkeleton();
         return;
     }
 
