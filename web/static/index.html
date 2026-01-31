@@ -599,6 +599,97 @@
             display: flex;
             flex-direction: column;
         }
+
+        .node-status-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-card);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .node-status-table thead {
+            background: var(--primary-light);
+        }
+
+        .node-status-table thead th {
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-main);
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .node-status-table tbody tr {
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .node-status-table tbody tr:last-child {
+            border-bottom: none;
+        }
+
+        .node-status-table tbody tr:hover {
+            background: var(--primary-lighter);
+        }
+
+        .node-status-table td {
+            padding: 12px;
+            font-size: 13px;
+        }
+
+        .node-name-cell {
+            font-weight: 500;
+            color: var(--text-main);
+            width: 30%;
+        }
+
+        .image-tag-success {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--success-color);
+            color: white;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-right: 6px;
+            margin-bottom: 4px;
+        }
+
+        .image-tag-failed {
+            display: inline-block;
+            padding: 2px 8px;
+            background: var(--error-color);
+            color: white;
+            border-radius: 4px;
+            font-size: 11px;
+            margin-right: 6px;
+            margin-bottom: 4px;
+        }
+
+        .detail-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 4px 0;
+        }
+
+        .failed-nodes {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+        }
+
+        .failed-node-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #fecaca;
+            font-size: 13px;
+        }
+
+        .failed-node-item:last-child {
+            border-bottom: none;
+        }
     </style>
 </head>
 

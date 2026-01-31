@@ -711,45 +711,49 @@ function renderDetailModal(task) {
                 <div class="stat-value failed">${task.progress ? task.progress.failedNodes : 0}</div>
             </div>
         </div>
-        
-        <div style="background: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-            <div style="display: grid; grid-template-columns:1fr 1fr; gap: 16px;">
-                <div class="detail-row"><strong>任务 ID:</strong> ${task.taskId}</div>
+
+        <div class="form-section">
+            <div class="form-section-title">
+                <span>任务信息</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;">
+                <div class="detail-row"><strong>任务 ID:</strong> <span style="font-family: monospace; color: var(--primary-color);">${task.taskId}</span></div>
                  <div class="detail-row"><strong>创建时间:</strong> ${formatTime(task.createdAt)}</div>
                  <div class="detail-row"><strong>重试策略:</strong> ${task.retryStrategy} (最大重试 ${task.maxRetries} 次)</div>
             </div>
-            ${task.secretName ? `
-            <div style="margin-top: 12px; padding: 12px; background: #eef2ff; border: 1px solid #c7d2fe; border-radius: 6px;">
-                <div class="detail-row" style="color: #3730a3;">
-                    <strong style="color: #3730a3;">私有仓库认证:</strong>
-                    <span class="status-badge" style="background: #dbeafe; color: #1e40af;">已启用</span>
+        </div>
+
+        ${task.secretName ? `
+        <div class="form-section">
+            <div class="form-section-title">
+                <span>私有仓库认证</span>
+                <span class="status-badge bg-enabled">已启用</span>
+            </div>
+            <div style="padding: 12px; background: var(--primary-light); border: 1px solid var(--primary-lighter); border-radius: 6px;">
+                <div class="detail-row" style="color: var(--text-main);">
+                    <strong>Secret 名称:</strong>
+                    <span style="font-family: monospace; font-size: 13px;">${task.secretName}</span>
                 </div>
-                <div class="detail-row" style="color: #3730a3;">
-                    <strong style="color: #3730a3;">Secret 名称:</strong>
-                    <span style="font-family: monospace; font-size: 13px; color: #3730a3;">${task.secretName}</span>
-                </div>
-                <div style="font-size: 11px; color: #6366f1; margin-top: 4px;">
-                    <svg class="icon" style="width: 12px; height: 12px; color: #6366f1; vertical-align: text-bottom;" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-5v5zM12 16.5a2.5 2.5 0 110-5 2.5 2.5 0 010-5z"/></svg>
+                <div style="font-size: 12px; color: var(--primary-color); margin-top: 8px; display: flex; align-items: center; gap: 6px;">
+                    <svg class="icon" style="width: 14px; height: 14px;" viewBox="0 0 24 24">
+                        <path d="M12 22s8-4 8-10V5l-8-5v5zM12 16.5a2.5 2.5 0 110-5 2.5 2.5 0 010-5z" />
+                    </svg>
                     临时 Secret 会在任务完成后自动清理
                 </div>
             </div>
-            ` : ''}
-             <div style="margin-top: 12px;">
-                <strong>镜像列表:</strong>
-                <div style="max-height: 100px; overflow-y: auto; background: #fff; padding: 8px; border:1px solid #e5e7eb; border-radius:4px; margin-top: 4px; font-family: monospace; font-size: 12px;">
-                    ${task.images.join('<br>')}
-                </div>
-            </div>
         </div>
-             <div style="margin-top: 12px;">
-                <strong>镜像列表:</strong>
-                <div style="max-height: 100px; overflow-y: auto; background: #fff; padding: 8px; border: 1px solid #e5e7eb; border-radius: 4px; margin-top: 4px; font-family: monospace; font-size: 12px;">
-                    ${task.images.join('<br>')}
-                </div>
+        ` : ''}
+
+        <div class="form-section">
+            <div class="form-section-title">
+                <span>镜像列表</span>
+            </div>
+            <div style="max-height: 120px; overflow-y: auto; background: var(--bg-card); padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; font-family: monospace; font-size: 12px;">
+                ${task.images.map(img => `<div style="padding: 4px 0; border-bottom: 1px solid var(--border-light);">${img}</div>`).join('')}
             </div>
         </div>
 
-        ${renderNodeStatuses(task.nodeStatuses)}
+        ${renderNodeStatuses(task.nodeStatuses || {})}
         ${task.failedNodes && task.failedNodes.length > 0 ? renderFailedNodes(task.failedNodes) : ''}
     `;
 
