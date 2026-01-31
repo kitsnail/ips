@@ -94,18 +94,10 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div class="card">
-      <div class="section-header">
-        <h3 class="section-title">最近任务</h3>
-        <div class="section-actions">
-          <el-button type="primary" size="small" @click="$router.push('/tasks')">
-            新建任务
-          </el-button>
-          <el-button size="small" @click="$router.push('/tasks')">
-            查看全部
-          </el-button>
-        </div>
-      </div>
+     <div class="card">
+       <div class="section-header">
+         <h3 class="section-title">最近任务</h3>
+       </div>
       <div class="table-container">
         <el-table :data="recentTasks" style="width: 100%">
           <el-table-column prop="taskId" label="任务ID" width="180" />

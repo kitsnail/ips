@@ -23,19 +23,19 @@ const login = async () => {
   <div v-else class="login-container">
     <h1>镜像预热控制台 (IPS)</h1>
     <div class="login-box">
-      <el-form @submit.prevent="login">
-        <el-form-item label="用户名">
-          <el-input v-model="username" placeholder="请输入用户名" />
-        </el-form-item>
-        <el-form-item label="密码">
-          <el-input v-model="password" type="password" placeholder="请输入密码" />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" native-type="submit" style="width: 100%">
-            登录
-          </el-button>
-        </el-form-item>
-      </el-form>
+       <el-form @submit.prevent="login" label-width="auto">
+         <el-form-item label="用户名">
+           <el-input v-model="username" placeholder="请输入用户名" />
+         </el-form-item>
+         <el-form-item label="密码">
+           <el-input v-model="password" type="password" placeholder="请输入密码" />
+         </el-form-item>
+         <el-form-item>
+           <el-button type="primary" native-type="submit" style="width: 100%">
+             登录
+           </el-button>
+         </el-form-item>
+       </el-form>
     </div>
   </div>
 </template>
