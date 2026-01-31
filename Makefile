@@ -1,7 +1,5 @@
 .PHONY: help build run test clean fmt lint deps tidy
-.PHONY: docker-build docker-run docker-stop docker-clean
-.PHONY: frontend-install frontend-dev frontend-build frontend-clean
-.PHONY: k8s-deploy k8s-status k8s-logs k8s-port-forward k8s-restart k8s-delete
+.PHONY: docker-build docker-clean
 .PHONY: frontend-install frontend-dev frontend-build frontend-clean
 
 # 默认目标
@@ -95,10 +93,6 @@ frontend-install: ## 安装前端依赖
 	@echo "$(GREEN)Installing frontend dependencies...$(RESET)"
 	@cd frontend && npm ci
 
-frontend-dev: ## 启动前端开发服务器
-	@echo "$(GREEN)Starting frontend dev server...$(RESET)"
-	@cd frontend && npm run dev
-
 frontend-build: ## 构建前端生产版本
 	@echo "$(GREEN)Building frontend for production...$(RESET)"
 	@cd frontend && npm run build
@@ -124,32 +118,6 @@ docker-build-no-cache: ## 构建 Docker 镜像（不使用缓存）
 	@echo "$(GREEN)Building Docker image (no cache)...$(RESET)"
 	@docker build --no-cache -t $(DOCKER_IMAGE):$(DOCKER_TAG) .
 
-##@ Kubernetes
-
-k8s-deploy: ## 部署到 Kubernetes 集群
-	@echo "$(GREEN)Deploying to Kubernetes...$(RESET)"
-	@kubectl apply -f deploy/
-
-k8s-status: ## 查看 Kubernetes 部署状态
-	@echo "$(GREEN)Checking deployment status...$(RESET)"
-	@kubectl get all -n $(K8S_NAMESPACE)
-
-k8s-logs: ## 查看 Kubernetes Pod 日志
-	@echo "$(GREEN)Streaming logs...$(RESET)"
-	@kubectl logs -l app=ips -n $(K8S_NAMESPACE) -f --all-containers=true
-
-k8s-port-forward: ## 端口转发到本地
-	@echo "$(GREEN)Port forwarding to localhost:$(SERVER_PORT)...$(RESET)"
-	@kubectl port-forward svc/ips-apiserver $(SERVER_PORT):8080 -n $(K8S_NAMESPACE)
-
-k8s-restart: ## 重启 Deployment
-	@echo "$(GREEN)Restarting deployment...$(RESET)"
-	@kubectl rollout restart deployment/ips-apiserver -n $(K8S_NAMESPACE)
-
-k8s-delete: ## 删除 Kubernetes 资源
-	@echo "$(YELLOW)Deleting Kubernetes resources...$(RESET)"
-	@kubectl delete -f deploy/
-
 
 ##@ 其他
 
@@ -167,6 +135,3 @@ api-test: ## 运行 API 测试脚本
 
 .PHONY: all
 all: clean fmt lint test build ## 执行完整的构建流程
-
-.PHONY: all-full
-all-full: clean frontend-build build ## 执行完整的构建流程（包含前端）
