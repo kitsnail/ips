@@ -1058,16 +1058,28 @@ function switchTab(tab) {
 }
 
 function showCreateTaskModal() {
-    // Reset form to default state
     const form = document.getElementById('createTaskForm');
     if (form) {
         form.reset();
-        // Ensure registry fields and required attributes are synced
         toggleRegistryFields();
+        toggleAdvancedSection();
     }
     document.getElementById('createModal').classList.add('show');
     refreshQuickLibrary();
     loadSecretsForDropdown();
+}
+
+function toggleAdvancedSection() {
+    const content = document.getElementById('advancedSection');
+    const toggle = document.querySelector('.form-section-toggle');
+
+    if (content.classList.contains('collapsed')) {
+        content.classList.remove('collapsed');
+        if (toggle) toggle.classList.remove('collapsed');
+    } else {
+        content.classList.add('collapsed');
+        if (toggle) toggle.classList.add('collapsed');
+    }
 }
 function hideCreateTaskModal() { document.getElementById('createModal').classList.remove('show'); }
 function showCreateUserModal() { document.getElementById('createUserModal').classList.add('show'); }
