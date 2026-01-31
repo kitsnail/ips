@@ -16,14 +16,16 @@ import (
 
 type AuthService struct {
 	userRepo   repository.UserRepository
+	tokenRepo  repository.APITokenRepository
 	k8sClient  kubernetes.Interface
 	jwtSecret  []byte
 	jwtExpires time.Duration
 }
 
-func NewAuthService(userRepo repository.UserRepository, k8sClient kubernetes.Interface, secret string) *AuthService {
+func NewAuthService(userRepo repository.UserRepository, tokenRepo repository.APITokenRepository, k8sClient kubernetes.Interface, secret string) *AuthService {
 	return &AuthService{
 		userRepo:   userRepo,
+		tokenRepo:  tokenRepo,
 		k8sClient:  k8sClient,
 		jwtSecret:  []byte(secret),
 		jwtExpires: 24 * time.Hour,
@@ -121,7 +123,7 @@ func (s *AuthService) validateJWT(tokenStr string) (*models.User, error) {
 }
 
 func (s *AuthService) validateStaticToken(ctx context.Context, tokenStr string) (*models.User, error) {
-	token, err := s.userRepo.GetToken(ctx, tokenStr)
+	token, err := s.tokenRepo.GetToken(ctx, tokenStr)
 	if err != nil {
 		return nil, err
 	}

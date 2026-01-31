@@ -11,8 +11,7 @@ import (
 )
 
 // SetupRouter 设置路由
-func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, authService *service.AuthService, userRepo repository.UserRepository, libraryRepo repository.LibraryRepository, secretRepo repository.SecretRegistryRepository) *gin.Engine {
-	// 设置Gin模式
+func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, scheduledTaskManager *service.ScheduledTaskManager, authService *service.AuthService, userRepo repository.UserRepository, libraryRepo repository.LibraryRepository, secretRepo repository.SecretRegistryRepository) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
@@ -45,6 +44,7 @@ func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, authSe
 	userHandler := handler.NewUserHandler(userRepo)
 	libraryHandler := handler.NewLibraryHandler(libraryRepo)
 	secretHandler := handler.NewSecretHandler(secretRepo)
+	scheduledTaskHandler := handler.NewScheduledTaskHandler(scheduledTaskManager)
 
 	// 登录接口 (公开)
 	router.POST("/api/v1/login", authHandler.Login)
@@ -81,6 +81,24 @@ func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, authSe
 			users.POST("", userHandler.CreateUser)
 			users.DELETE("/:id", userHandler.DeleteUser)
 		}
+
+		// 定时任务管理 (仅限管理员)
+		scheduledTasks := v1.Group("/scheduled-tasks")
+		scheduledTasks.Use(middleware.AdminOnly())
+		{
+			scheduledTasks.POST("", scheduledTaskHandler.CreateScheduledTask)
+			scheduledTasks.GET("", scheduledTaskHandler.ListScheduledTasks)
+			scheduledTasks.GET("/:id", scheduledTaskHandler.GetScheduledTask)
+			scheduledTasks.PUT("/:id", scheduledTaskHandler.UpdateScheduledTask)
+			scheduledTasks.DELETE("/:id", scheduledTaskHandler.DeleteScheduledTask)
+			scheduledTasks.PUT("/:id/enable", scheduledTaskHandler.EnableTask)
+			scheduledTasks.PUT("/:id/disable", scheduledTaskHandler.DisableTask)
+			scheduledTasks.POST("/:id/trigger", scheduledTaskHandler.TriggerTask)
+			scheduledTasks.GET("/:id/executions", scheduledTaskHandler.ListExecutions)
+			scheduledTasks.GET("/:id/executions/:executionId", scheduledTaskHandler.GetExecution)
+		}
+
+		return router
 	}
 
 	return router

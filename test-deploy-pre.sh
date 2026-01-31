@@ -12,3 +12,13 @@ skopeo copy \
 
 kubectl apply -k deploy
 kubectl rollout restart deployment ips-apiserver
+
+#skopeo copy \
+#  --dest-creds admin:Ck71rIzzpe1bc2gD \
+ # docker-daemon:ips-apiserver:v0.0.2 \
+ # docker://cr.shengshu1.hs1.paratera.com/library/ips-apiserver:v0.0.2
+
+#skopeo copy \
+#  --dest-creds admin:Ck71rIzzpe1bc2gD \
+#  docker-daemon:ips-apiserver:v0.0.2 \
+#  docker://cr.shengshu1.qd1.paratera.com/library/ips-apiserver:v0.0.2

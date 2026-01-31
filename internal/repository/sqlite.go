@@ -95,8 +95,41 @@ func (r *SQLiteRepository) initSchema() error {
 		updated_at DATETIME
 	);`
 
+	// 定时任务表
+	scheduledTaskSchema := `
+	CREATE TABLE IF NOT EXISTS scheduled_tasks (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL,
+		description TEXT,
+		cron_expr TEXT NOT NULL,
+		enabled INTEGER NOT NULL DEFAULT 1,
+		task_config TEXT NOT NULL,
+		overlap_policy TEXT NOT NULL DEFAULT 'skip',
+		timeout_seconds INTEGER NOT NULL DEFAULT 0,
+		last_execution_at DATETIME,
+		next_execution_at DATETIME,
+		created_by TEXT NOT NULL,
+		created_at DATETIME NOT NULL,
+		updated_at DATETIME NOT NULL
+	);`
+
+	// 定时任务执行历史表
+	scheduledExecutionSchema := `
+	CREATE TABLE IF NOT EXISTS scheduled_executions (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		scheduled_task_id TEXT NOT NULL,
+		task_id TEXT NOT NULL,
+		status TEXT NOT NULL,
+		started_at DATETIME NOT NULL,
+		finished_at DATETIME,
+		duration_seconds REAL,
+		error_message TEXT,
+		triggered_at DATETIME NOT NULL,
+		FOREIGN KEY (scheduled_task_id) REFERENCES scheduled_tasks(id) ON DELETE CASCADE
+	);`
+
 	// 创建基础表
-	for _, schema := range []string{taskSchema, userSchema, tokenSchema, librarySchema, secretSchema} {
+	for _, schema := range []string{taskSchema, userSchema, tokenSchema, librarySchema, secretSchema, scheduledTaskSchema, scheduledExecutionSchema} {
 		if _, err := r.db.Exec(schema); err != nil {
 			return err
 		}
@@ -113,6 +146,17 @@ func (r *SQLiteRepository) initSchema() error {
 	for _, migration := range migrations {
 		// 忽略错误（列可能已存在）
 		r.db.Exec(migration)
+	}
+
+	indexes := []string{
+		"CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_enabled ON scheduled_tasks(enabled)",
+		"CREATE INDEX IF NOT EXISTS idx_scheduled_tasks_next_execution ON scheduled_tasks(next_execution_at)",
+		"CREATE INDEX IF NOT EXISTS idx_scheduled_executions_task_id ON scheduled_executions(scheduled_task_id)",
+		"CREATE INDEX IF NOT EXISTS idx_scheduled_executions_status ON scheduled_executions(status)",
+		"CREATE INDEX IF NOT EXISTS idx_scheduled_executions_started_at ON scheduled_executions(started_at DESC)",
+	}
+	for _, idx := range indexes {
+		r.db.Exec(idx)
 	}
 
 	return nil
@@ -478,4 +522,248 @@ func (r *SQLiteRepository) UpdateSecret(ctx context.Context, secret *models.Regi
 func (r *SQLiteRepository) DeleteSecret(ctx context.Context, id int64) error {
 	_, err := r.db.ExecContext(ctx, "DELETE FROM registry_secrets WHERE id = ?", id)
 	return err
+}
+
+// ScheduledTaskRepository Implementation
+
+func (r *SQLiteRepository) CreateScheduledTask(ctx context.Context, task *models.ScheduledTask) error {
+	taskConfigJSON, _ := json.Marshal(task.TaskConfig)
+
+	query := `INSERT INTO scheduled_tasks (id, name, description, cron_expr, enabled, task_config,
+		overlap_policy, timeout_seconds, last_execution_at, next_execution_at, created_by, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+
+	_, err := r.db.ExecContext(ctx, query,
+		task.ID, task.Name, task.Description, task.CronExpr, task.Enabled, taskConfigJSON,
+		task.OverlapPolicy, task.TimeoutSeconds, task.LastExecutionAt, task.NextExecutionAt, task.CreatedBy, task.CreatedAt, task.UpdatedAt)
+	return err
+}
+
+func (r *SQLiteRepository) GetScheduledTask(ctx context.Context, id string) (*models.ScheduledTask, error) {
+	query := `SELECT id, name, description, cron_expr, enabled, task_config,
+		overlap_policy, timeout_seconds, last_execution_at, next_execution_at, created_by, created_at, updated_at
+		FROM scheduled_tasks WHERE id = ?`
+
+	row := r.db.QueryRowContext(ctx, query, id)
+	var task models.ScheduledTask
+	var taskConfigJSON []byte
+
+	err := row.Scan(&task.ID, &task.Name, &task.Description, &task.CronExpr, &task.Enabled, &taskConfigJSON,
+		&task.OverlapPolicy, &task.TimeoutSeconds, &task.LastExecutionAt, &task.NextExecutionAt, &task.CreatedBy, &task.CreatedAt, &task.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrScheduledTaskNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	json.Unmarshal(taskConfigJSON, &task.TaskConfig)
+	return &task, nil
+}
+
+func (r *SQLiteRepository) ListScheduledTasks(ctx context.Context, offset, limit int) ([]*models.ScheduledTask, int, error) {
+	var total int
+	err := r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM scheduled_tasks").Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	query := `SELECT id, name, description, cron_expr, enabled, task_config,
+		overlap_policy, timeout_seconds, last_execution_at, next_execution_at, created_by, created_at, updated_at
+		FROM scheduled_tasks ORDER BY created_at DESC LIMIT ? OFFSET ?`
+
+	rows, err := r.db.QueryContext(ctx, query, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var tasks []*models.ScheduledTask
+	for rows.Next() {
+		var task models.ScheduledTask
+		var taskConfigJSON []byte
+
+		err := rows.Scan(&task.ID, &task.Name, &task.Description, &task.CronExpr, &task.Enabled, &taskConfigJSON,
+			&task.OverlapPolicy, &task.TimeoutSeconds, &task.LastExecutionAt, &task.NextExecutionAt, &task.CreatedBy, &task.CreatedAt, &task.UpdatedAt)
+		if err != nil {
+			return nil, 0, err
+		}
+
+		json.Unmarshal(taskConfigJSON, &task.TaskConfig)
+		tasks = append(tasks, &task)
+	}
+	return tasks, total, nil
+}
+
+func (r *SQLiteRepository) ListEnabledScheduledTasks(ctx context.Context) ([]*models.ScheduledTask, error) {
+	query := `SELECT id, name, description, cron_expr, enabled, task_config,
+		overlap_policy, timeout_seconds, last_execution_at, next_execution_at, created_by, created_at, updated_at
+		FROM scheduled_tasks WHERE enabled = 1 ORDER BY created_at DESC`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var tasks []*models.ScheduledTask
+	for rows.Next() {
+		var task models.ScheduledTask
+		var taskConfigJSON []byte
+
+		err := rows.Scan(&task.ID, &task.Name, &task.Description, &task.CronExpr, &task.Enabled, &taskConfigJSON,
+			&task.OverlapPolicy, &task.TimeoutSeconds, &task.LastExecutionAt, &task.NextExecutionAt, &task.CreatedBy, &task.CreatedAt, &task.UpdatedAt)
+		if err != nil {
+			return nil, err
+		}
+
+		json.Unmarshal(taskConfigJSON, &task.TaskConfig)
+		tasks = append(tasks, &task)
+	}
+	return tasks, nil
+}
+
+func (r *SQLiteRepository) UpdateScheduledTask(ctx context.Context, task *models.ScheduledTask) error {
+	task.UpdatedAt = time.Now()
+	taskConfigJSON, _ := json.Marshal(task.TaskConfig)
+
+	query := `UPDATE scheduled_tasks SET name=?, description=?, cron_expr=?, enabled=?, task_config=?,
+		overlap_policy=?, timeout_seconds=?, updated_at=? WHERE id=?`
+
+	_, err := r.db.ExecContext(ctx, query,
+		task.Name, task.Description, task.CronExpr, task.Enabled, taskConfigJSON,
+		task.OverlapPolicy, task.TimeoutSeconds, task.UpdatedAt, task.ID)
+	return err
+}
+
+func (r *SQLiteRepository) DeleteScheduledTask(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, "DELETE FROM scheduled_tasks WHERE id = ?", id)
+	return err
+}
+
+// ScheduledExecutionRepository Implementation
+
+func (r *SQLiteRepository) CreateExecution(ctx context.Context, execution *models.ScheduledExecution) error {
+	query := `INSERT INTO scheduled_executions (scheduled_task_id, task_id, status,
+		started_at, finished_at, duration_seconds, error_message, triggered_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+
+	res, err := r.db.ExecContext(ctx, query,
+		execution.ScheduledTaskID, execution.TaskID, execution.Status,
+		execution.StartedAt, execution.FinishedAt, execution.DurationSeconds,
+		execution.ErrorMessage, execution.TriggeredAt)
+	if err != nil {
+		return err
+	}
+	id, _ := res.LastInsertId()
+	execution.ID = id
+	return nil
+}
+
+func (r *SQLiteRepository) GetExecution(ctx context.Context, id int64) (*models.ScheduledExecution, error) {
+	query := `SELECT id, scheduled_task_id, task_id, status, started_at, finished_at,
+		duration_seconds, error_message, triggered_at
+		FROM scheduled_executions WHERE id = ?`
+
+	row := r.db.QueryRowContext(ctx, query, id)
+	var execution models.ScheduledExecution
+	err := row.Scan(&execution.ID, &execution.ScheduledTaskID, &execution.TaskID, &execution.Status,
+		&execution.StartedAt, &execution.FinishedAt, &execution.DurationSeconds,
+		&execution.ErrorMessage, &execution.TriggeredAt)
+
+	if err == sql.ErrNoRows {
+		return nil, ErrTaskNotFound
+	}
+	return &execution, err
+}
+
+func (r *SQLiteRepository) ListExecutions(ctx context.Context, scheduledTaskID string, offset, limit int) ([]*models.ScheduledExecution, int, error) {
+	var total int
+	var err error
+	if scheduledTaskID != "" {
+		err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM scheduled_executions WHERE scheduled_task_id = ?", scheduledTaskID).Scan(&total)
+	} else {
+		err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM scheduled_executions").Scan(&total)
+	}
+	if err != nil {
+		return nil, 0, err
+	}
+
+	query := `SELECT id, scheduled_task_id, task_id, status, started_at, finished_at,
+		duration_seconds, error_message, triggered_at
+		FROM scheduled_executions`
+	var args []interface{}
+	if scheduledTaskID != "" {
+		query += " WHERE scheduled_task_id = ?"
+		args = append(args, scheduledTaskID)
+	}
+	query += " ORDER BY started_at DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var executions []*models.ScheduledExecution
+	for rows.Next() {
+		var execution models.ScheduledExecution
+		err := rows.Scan(&execution.ID, &execution.ScheduledTaskID, &execution.TaskID, &execution.Status,
+			&execution.StartedAt, &execution.FinishedAt, &execution.DurationSeconds,
+			&execution.ErrorMessage, &execution.TriggeredAt)
+		if err != nil {
+			return nil, 0, err
+		}
+		executions = append(executions, &execution)
+	}
+	return executions, total, nil
+}
+
+func (r *SQLiteRepository) ListRunningExecutions(ctx context.Context, scheduledTaskID string) ([]*models.ScheduledExecution, error) {
+	query := `SELECT id, scheduled_task_id, task_id, status, started_at, finished_at,
+		duration_seconds, error_message, triggered_at
+		FROM scheduled_executions WHERE status = ?`
+	var args []interface{}
+	args = append(args, models.ScheduledExecutionSuccess)
+	if scheduledTaskID != "" {
+		query += " AND scheduled_task_id = ?"
+		args = append(args, scheduledTaskID)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var executions []*models.ScheduledExecution
+	for rows.Next() {
+		var execution models.ScheduledExecution
+		err := rows.Scan(&execution.ID, &execution.ScheduledTaskID, &execution.TaskID, &execution.Status,
+			&execution.StartedAt, &execution.FinishedAt, &execution.DurationSeconds,
+			&execution.ErrorMessage, &execution.TriggeredAt)
+		if err != nil {
+			return nil, err
+		}
+		executions = append(executions, &execution)
+	}
+	return executions, nil
+}
+
+func (r *SQLiteRepository) UpdateExecution(ctx context.Context, execution *models.ScheduledExecution) error {
+	query := `UPDATE scheduled_executions SET status=?, finished_at=?, duration_seconds=?, error_message=? WHERE id=?`
+	_, err := r.db.ExecContext(ctx, query,
+		execution.Status, execution.FinishedAt, execution.DurationSeconds, execution.ErrorMessage, execution.ID)
+	return err
+}
+
+func (r *SQLiteRepository) DeleteOldExecutions(ctx context.Context, before time.Time) (int64, error) {
+	result, err := r.db.ExecContext(ctx, "DELETE FROM scheduled_executions WHERE finished_at < ?", before)
+	if err != nil {
+		return 0, err
+	}
+	rows, _ := result.RowsAffected()
+	return rows, nil
 }

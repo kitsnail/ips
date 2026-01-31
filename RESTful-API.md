@@ -323,7 +323,271 @@ DELETE /api/v1/tasks/task-20240116-abc123
 
 ---
 
-### 5. 健康检查
+### 5. 定时任务管理
+
+#### 5.1 创建定时任务
+
+**请求**：
+```http
+POST /api/v1/scheduled-tasks
+```
+
+**请求体**：
+```json
+{
+  "name": "Daily Image Prewarm",
+  "description": "Prewarm nginx and redis every day at midnight",
+  "cronExpr": "0 0 * * *",
+  "enabled": true,
+  "taskConfig": {
+    "images": ["nginx:latest", "redis:7"],
+    "batchSize": 10,
+    "priority": 1,
+    "nodeSelector": {"prewarm": "true"},
+    "maxRetries": 3,
+    "retryStrategy": "linear",
+    "retryDelay": 60,
+    "webhookUrl": "https://hooks.example.com/notify"
+  },
+  "overlapPolicy": "skip",
+  "timeoutSeconds": 3600
+}
+```
+
+**成功响应（201 Created）**：
+```json
+{
+  "id": "scheduled-task-20240116-abc123",
+  "name": "Daily Image Prewarm",
+  "description": "Prewarm nginx and redis every day at midnight",
+  "cronExpr": "0 0 * * *",
+  "enabled": true,
+  "taskConfig": {
+    "images": ["nginx:latest", "redis:7"],
+    "batchSize": 10,
+    "priority": 1,
+    "nodeSelector": {"prewarm": "true"},
+    "maxRetries": 3,
+    "retryStrategy": "linear",
+    "retryDelay": 60,
+    "webhookUrl": "https://hooks.example.com/notify"
+  },
+  "overlapPolicy": "skip",
+  "timeoutSeconds": 3600,
+  "lastExecutionAt": null,
+  "nextExecutionAt": "2024-01-17T00:00:00Z",
+  "createdBy": "admin",
+  "createdAt": "2024-01-16T10:00:00Z",
+  "updatedAt": "2024-01-16T10:00:00Z"
+}
+```
+
+**字段说明**：
+- `cronExpr`: Cron 表达式（5字段标准格式：分 时 日 月 周）
+- `overlapPolicy`: 重叠策略
+  - `skip`: 跳过本次执行（默认）
+  - `allow`: 允许并行执行
+  - `queue`: 等待上次完成后执行（暂未实现）
+- `timeoutSeconds`: 超时时间（0表示无限制）
+
+#### 5.2 获取定时任务列表
+
+**请求**：
+```http
+GET /api/v1/scheduled-tasks?offset=0&limit=10
+```
+
+**成功响应（200 OK）**：
+```json
+{
+  "tasks": [
+    {
+      "id": "scheduled-task-20240116-abc123",
+      "name": "Daily Image Prewarm",
+      "cronExpr": "0 0 * * *",
+      "enabled": true,
+      "nextExecutionAt": "2024-01-17T00:00:00Z"
+    }
+  ],
+  "total": 5,
+  "limit": 10,
+  "offset": 0
+}
+```
+
+#### 5.3 获取单个定时任务
+
+**请求**：
+```http
+GET /api/v1/scheduled-tasks/:id
+```
+
+**成功响应（200 OK）**：
+```json
+{
+  "id": "scheduled-task-20240116-abc123",
+  "name": "Daily Image Prewarm",
+  "cronExpr": "0 0 * * *",
+  "enabled": true,
+  "taskConfig": {...},
+  "overlapPolicy": "skip",
+  "timeoutSeconds": 3600,
+  "lastExecutionAt": "2024-01-16T00:00:00Z",
+  "nextExecutionAt": "2024-01-17T00:00:00Z",
+  "createdBy": "admin",
+  "createdAt": "2024-01-16T10:00:00Z",
+  "updatedAt": "2024-01-16T10:00:00Z"
+}
+```
+
+#### 5.4 更新定时任务
+
+**请求**：
+```http
+PUT /api/v1/scheduled-tasks/:id
+```
+
+**请求体**（所有字段可选）**：
+```json
+{
+  "name": "Updated Task Name",
+  "cronExpr": "0 6 * * *",
+  "enabled": true,
+  "taskConfig": {
+    "images": ["nginx:latest"]
+  },
+  "overlapPolicy": "allow",
+  "timeoutSeconds": 1800
+}
+```
+
+**成功响应（200 OK）**：
+返回更新后的定时任务对象（同 GET 响应）
+
+#### 5.5 删除定时任务
+
+**请求**：
+```http
+DELETE /api/v1/scheduled-tasks/:id
+```
+
+**成功响应（200 OK）**：
+```json
+{
+  "taskId": "scheduled-task-20240116-abc123",
+  "status": "success",
+  "message": "Scheduled task deleted successfully"
+}
+```
+
+#### 5.6 启用定时任务
+
+**请求**：
+```http
+PUT /api/v1/scheduled-tasks/:id/enable
+```
+
+**成功响应（200 OK）**：
+```json
+{
+  "taskId": "scheduled-task-20240116-abc123",
+  "status": "success",
+  "message": "Scheduled task enabled successfully"
+}
+```
+
+#### 5.7 禁用定时任务
+
+**请求**：
+```http
+PUT /api/v1/scheduled-tasks/:id/disable
+```
+
+**成功响应（200 OK）**：
+```json
+{
+  "taskId": "scheduled-task-20240116-abc123",
+  "status": "success",
+  "message": "Scheduled task disabled successfully"
+}
+```
+
+#### 5.8 手动触发定时任务
+
+**请求**：
+```http
+POST /api/v1/scheduled-tasks/:id/trigger
+```
+
+**成功响应（200 OK）**：
+```json
+{
+  "taskId": "task-20240116-xyz789",
+  "status": "success",
+  "message": "Scheduled task triggered successfully"
+}
+```
+
+#### 5.9 查询执行历史
+
+**请求**：
+```http
+GET /api/v1/scheduled-tasks/:id/executions?offset=0&limit=10
+```
+
+**成功响应（200 OK）**：
+```json
+{
+  "executions": [
+    {
+      "id": 1,
+      "scheduledTaskId": "scheduled-task-20240116-abc123",
+      "taskId": "task-20240116-xyz789",
+      "status": "success",
+      "startedAt": "2024-01-16T00:00:00Z",
+      "finishedAt": "2024-01-16T00:10:00Z",
+      "durationSeconds": 600.0,
+      "errorMessage": "",
+      "triggeredAt": "2024-01-16T00:00:00Z"
+    }
+  ],
+  "total": 50,
+  "limit": 10,
+  "offset": 0
+}
+```
+
+**执行状态**：
+- `success`: 执行成功
+- `failed`: 执行失败
+- `skipped`: 跳过执行（重叠策略为 skip，上次任务仍在运行）
+- `timeout`: 执行超时
+
+#### 5.10 获取单次执行详情
+
+**请求**：
+```http
+GET /api/v1/scheduled-tasks/:id/executions/:executionId
+```
+
+**成功响应（200 OK）**：
+```json
+{
+  "id": 1,
+  "scheduledTaskId": "scheduled-task-20240116-abc123",
+  "taskId": "task-20240116-xyz789",
+  "status": "success",
+  "startedAt": "2024-01-16T00:00:00Z",
+  "finishedAt": "2024-01-16T00:10:00Z",
+  "durationSeconds": 600.0,
+  "errorMessage": "",
+  "triggeredAt": "2024-01-16T00:00:00Z"
+}
+```
+
+---
+
+### 6. 健康检查
 
 **请求**：
 ```http

@@ -42,6 +42,42 @@ var (
 		},
 	)
 
+	// ScheduledTasksTotal 定时任务总数（按启用状态分类）
+	ScheduledTasksTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ips_scheduled_tasks_total",
+			Help: "Total number of scheduled tasks by enabled status",
+		},
+		[]string{"enabled"},
+	)
+
+	// ScheduledTaskExecutionsTotal 定时任务执行次数（按状态分类）
+	ScheduledTaskExecutionsTotal = promauto.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "ips_scheduled_task_executions_total",
+			Help: "Total number of scheduled task executions by status",
+		},
+		[]string{"status"},
+	)
+
+	// ScheduledTaskExecutionDurationSeconds 定时任务执行耗时直方图
+	ScheduledTaskExecutionDurationSeconds = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
+			Name:    "ips_scheduled_task_execution_duration_seconds",
+			Help:    "Duration of scheduled task executions in seconds",
+			Buckets: []float64{10, 30, 60, 120, 300, 600, 1200, 1800, 3600},
+		},
+		[]string{"status"},
+	)
+
+	// ActiveScheduledTasks 当前活跃定时任务数
+	ActiveScheduledTasks = promauto.NewGauge(
+		prometheus.GaugeOpts{
+			Name: "ips_active_scheduled_tasks",
+			Help: "Current number of enabled scheduled tasks",
+		},
+	)
+
 	// APIRequestDuration API 请求耗时
 	APIRequestDuration = promauto.NewHistogramVec(
 		prometheus.HistogramOpts{
@@ -91,7 +127,7 @@ var (
 	ImagePrewarmStatus = promauto.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Name: "ips_image_prewarm_status",
-			Help: "Detailed status of each image prewarming on each node (1 for the current status)",
+			Help: "Detailed status of each image prewarming on each node (1 for success, 0 for failed)",
 		},
 		[]string{"node", "image", "status"}, // status: success, failed
 	)

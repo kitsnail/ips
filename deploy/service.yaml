@@ -18,7 +18,7 @@ spec:
     component: apiserver
   ports:
     - name: http
-      port: 8080
+      port: 80
       targetPort: http
       protocol: TCP
   # Session affinity: ensure requests from same client route to same pod

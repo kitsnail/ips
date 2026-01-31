@@ -121,7 +121,7 @@ func main() {
 		jwtSecret = "ips-default-secret-change-me"
 		logger.Warn("JWT_SECRET not set, using default secret")
 	}
-	authService := service.NewAuthService(repo, k8sClient.Clientset, jwtSecret)
+	authService := service.NewAuthService(repo, repo, k8sClient.Clientset, jwtSecret)
 
 	// 5. 初始化任务管理器
 	taskManager := service.NewTaskManager(
@@ -134,8 +134,22 @@ func main() {
 	)
 	logger.Info("Task manager initialized")
 
+	// 5.5. 初始化定时任务管理器
+	scheduledTaskManager := service.NewScheduledTaskManager(
+		repo,
+		repo,
+		taskManager,
+		logger,
+	)
+
+	// 启动定时任务管理器
+	if err := scheduledTaskManager.Start(); err != nil {
+		logger.Fatalf("Failed to start scheduled task manager: %v", err)
+	}
+	logger.Info("Scheduled task manager initialized")
+
 	// 6. 设置路由
-	router := api.SetupRouter(logger, taskManager, authService, repo, repo, repo)
+	router := api.SetupRouter(logger, taskManager, scheduledTaskManager, authService, repo, repo, repo)
 
 	// 6. 创建HTTP服务器
 	port := os.Getenv("SERVER_PORT")
@@ -164,6 +178,8 @@ func main() {
 	<-quit
 
 	logger.Info("Shutting down server...")
+
+	scheduledTaskManager.Stop()
 
 	// 优雅关闭，设置5秒超时
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

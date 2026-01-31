@@ -20,17 +20,26 @@ Image Prewarm Service (IPS) is a RESTful API service built in Go that pre-warms 
 The service follows a layered architecture:
 
 1. **API Layer** (`internal/api/`)
-   - HTTP handlers for task operations (create, get, list, cancel)
-   - Middleware: logging, recovery, Prometheus metrics
-   - Router setup with Gin
+    - HTTP handlers for task operations (create, get, list, cancel)
+    - HTTP handlers for scheduled task operations (create, get, list, update, delete, enable/disable, trigger)
+    - Scheduled task execution history endpoints
+    - Middleware: logging, recovery, Prometheus metrics
+    - Router setup with Gin
 
 2. **Service Layer** (`internal/service/`)
-   - **TaskManager**: Orchestrates task lifecycle with priority queue and concurrency control (max 3 concurrent tasks by default)
-   - **BatchScheduler**: Splits nodes into batches and creates Kubernetes Jobs sequentially
-   - **StatusTracker**: Uses Kubernetes Watch API to track Job status in real-time
-   - **NodeFilter**: Filters nodes based on selector labels and readiness
-   - **WebhookNotifier**: Sends HTTP notifications for task completion/failure/cancellation
-   - **Retry strategies**: Linear and exponential backoff
+    - **TaskManager**: Orchestrates task lifecycle with priority queue and concurrency control (max 3 concurrent tasks by default)
+    - **BatchScheduler**: Splits nodes into batches and creates Kubernetes Jobs sequentially
+    - **StatusTracker**: Uses Kubernetes Watch API to track Job status in real-time
+    - **NodeFilter**: Filters nodes based on selector labels and readiness
+    - **WebhookNotifier**: Sends HTTP notifications for task completion/failure/cancellation
+    - **ScheduledTaskManager**: Manages scheduled (cron-based) tasks using robfig/cron/v3
+      - Create/Update/Delete scheduled tasks
+      - Enable/Disable scheduled tasks
+      - Trigger manual execution of scheduled tasks
+      - Execution history tracking
+      - Overlap policies: skip, allow (queue not yet implemented)
+      - Timeout control for long-running tasks
+    - **Retry strategies**: Linear and exponential backoff
 
 3. **Repository Layer** (`internal/repository/`)
    - In-memory storage implementation (thread-safe with sync.RWMutex)
@@ -42,9 +51,11 @@ The service follows a layered architecture:
    - **Node operations**: List and filter nodes
 
  5. **Models** (`pkg/models/`)
-    - Task: Core data model with status, progress, priority, retry config, webhook URL, secretName
-    - Progress: Tracks node completion percentage and batch progress
-    - Request/Response DTOs
+     - Task: Core data model with status, progress, priority, retry config, webhook URL, secretName
+     - Progress: Tracks node completion percentage and batch progress
+     - ScheduledTask: Scheduled task model with cron expression, enabled state, overlap policy, timeout
+     - ScheduledExecution: Execution history record for scheduled tasks
+     - Request/Response DTOs for tasks and scheduled tasks
 
 ### Task Execution Flow
 
