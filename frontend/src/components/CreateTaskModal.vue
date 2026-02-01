@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { taskApi, libraryApi, secretApi } from '@/services/api'
 import type { CreateTaskRequest, LibraryImage, Secret } from '@/types/api'
@@ -25,13 +25,17 @@ const form = ref<CreateTaskRequest>({
 
 const enableRegistry = ref(false)
 const authMode = ref<'manual' | 'select'>('manual')
-const selectedLibraryImages = ref<number[]>([])
+const manualImageInput = ref('')
 
 const libraryImages = ref<LibraryImage[]>([])
 const secrets = ref<Secret[]>([])
 const loading = ref(false)
 const libraryLoading = ref(false)
 const secretsLoading = ref(false)
+
+const searchText = ref('')
+const sortField = ref<'name' | 'createdAt'>('name')
+const sortOrder = ref<'asc' | 'desc'>('asc')
 
 const loadLibraryImages = async () => {
   try {
@@ -60,25 +64,77 @@ const loadSecrets = async () => {
 const handleOpen = () => {
   loadLibraryImages()
   loadSecrets()
+  manualImageInput.value = ''
+  searchText.value = ''
 }
 
 const handleClose = () => {
   emit('update:visible', false)
 }
 
+const isImageAdded = (imageUrl: string): boolean => {
+  const manualImages = manualImageInput.value
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0)
+  return manualImages.includes(imageUrl)
+}
+
+const filteredImages = computed(() => {
+  let filtered = libraryImages.value
+
+  if (searchText.value) {
+    const searchLower = searchText.value.toLowerCase()
+    filtered = filtered.filter(img =>
+      img.name.toLowerCase().includes(searchLower) ||
+      img.image.toLowerCase().includes(searchLower)
+    )
+  }
+
+  if (sortField.value === 'name') {
+    filtered = [...filtered].sort((a, b) => {
+      const comparison = a.name.localeCompare(b.name)
+      return sortOrder.value === 'asc' ? comparison : -comparison
+    })
+  } else {
+    filtered = [...filtered].sort((a, b) => {
+      const comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+      return sortOrder.value === 'asc' ? comparison : -comparison
+    })
+  }
+
+  return filtered
+})
+
+const addToManualInput = (imageUrl: string) => {
+  if (!isImageAdded(imageUrl)) {
+    const currentImages = manualImageInput.value
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
+    currentImages.push(imageUrl)
+    manualImageInput.value = currentImages.join('\n')
+  }
+}
+
+const removeFromManualInput = (imageUrl: string) => {
+  const lines = manualImageInput.value.split('\n')
+  const newLines = lines.filter(line => line.trim() !== imageUrl)
+  manualImageInput.value = newLines.join('\n')
+}
+
 const submit = async () => {
   try {
-    // Convert selected image IDs to image URLs
-    const selectedImages = selectedLibraryImages.value
-      .map(id => libraryImages.value.find(img => img.id === id)?.image)
-      .filter((img): img is string => !!img)
+    const selectedImages = manualImageInput.value
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0)
 
     if (selectedImages.length === 0) {
-      ElMessage.warning('请至少选择一个镜像')
+      ElMessage.warning('请至少添加一个镜像')
       return
     }
 
-    // Update form with selected images
     form.value.images = selectedImages
 
     loading.value = true
@@ -103,43 +159,83 @@ defineExpose({
     :model-value="visible"
     @update:model-value="(val: boolean) => emit('update:visible', val)"
     title="创建镜像预热任务"
-    width="800px"
+    width="1200px"
     @open="handleOpen"
   >
     <el-form label-width="120px">
-      <el-form-item label="镜像列表">
-        <el-checkbox-group v-model="selectedLibraryImages">
-          <div class="image-picker">
-            <el-checkbox
-              v-for="img in libraryImages"
-              :key="img.id"
-              :label="img.id"
-              border
-            >
-              <div class="image-item">
-                <div class="image-name">{{ img.name }}</div>
-                <div class="image-url">{{ img.image }}</div>
-              </div>
-            </el-checkbox>
+      <el-form-item label="镜像列表" required>
+        <div class="image-section">
+          <div class="image-input-section">
+            <div class="section-title">手动输入</div>
+            <el-input
+              v-model="manualImageInput"
+              type="textarea"
+              :rows="12"
+              placeholder="每行输入一个镜像地址，例如：&#10;docker.io/library/nginx:latest&#10;registry.cn-hangzhou.aliyuncs.com/library/redis:7"
+              class="manual-input"
+            />
           </div>
-          <div v-if="libraryLoading" class="loading-text">加载中...</div>
-          <el-empty v-else-if="libraryImages.length === 0" description="暂无镜像" :image-size="80" />
-        </el-checkbox-group>
-      </el-form-item>
 
-      <el-form-item label="已选镜像">
-        <div class="selected-images">
-          <el-tag
-            v-for="imgId in selectedLibraryImages"
-            :key="imgId"
-            closable
-            @close="() => {
-              const index = selectedLibraryImages.indexOf(imgId)
-              if (index > -1) selectedLibraryImages.splice(index, 1)
-            }"
-          >
-            {{ libraryImages.find((i) => i.id === imgId)?.name }}
-          </el-tag>
+          <div class="image-library-section">
+            <div class="section-header">
+              <div class="section-title">从镜像库选择</div>
+              <div class="controls">
+                <el-input
+                  v-model="searchText"
+                  placeholder="搜索镜像..."
+                  :prefix-icon="'Search'"
+                  class="search-input"
+                  clearable
+                />
+                <el-select v-model="sortField" class="sort-select">
+                  <el-option label="按名称" value="name" />
+                  <el-option label="按添加时间" value="createdAt" />
+                </el-select>
+                <el-button
+                  :icon="sortOrder === 'asc' ? 'ArrowUp' : 'ArrowDown'"
+                  @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
+                  size="small"
+                />
+              </div>
+            </div>
+            <div v-if="libraryLoading" class="loading-text">加载中...</div>
+            <el-empty v-else-if="filteredImages.length === 0" description="暂无镜像" :image-size="60" />
+            <div v-else class="table-container">
+              <table class="image-table">
+                <thead>
+                  <tr>
+                    <th style="width: 60%">显示名称</th>
+                    <th style="width: 30%">镜像地址</th>
+                    <th style="width: 10%">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="img in filteredImages" :key="img.id" class="table-row">
+                    <td>{{ img.name }}</td>
+                    <td class="url-cell">{{ img.image }}</td>
+                    <td>
+                      <el-button
+                        v-if="isImageAdded(img.image)"
+                        type="danger"
+                        size="small"
+                        @click="removeFromManualInput(img.image)"
+                      >
+                        已添加
+                      </el-button>
+                      <el-button
+                        v-else
+                        type="primary"
+                        size="small"
+                        @click="addToManualInput(img.image)"
+                      >
+                        添加
+                      </el-button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </el-form-item>
 
@@ -149,6 +245,17 @@ defineExpose({
 
       <el-form-item label="优先级">
         <el-input-number v-model="form.priority" :min="1" :max="10" />
+      </el-form-item>
+
+      <el-form-item label="最大重试">
+        <el-input-number v-model="form.maxRetries" :min="0" :max="5" />
+      </el-form-item>
+
+      <el-form-item label="重试策略">
+        <el-select v-model="form.retryStrategy">
+          <el-option label="线性" value="linear" />
+          <el-option label="指数退避" value="exponential" />
+        </el-select>
       </el-form-item>
 
       <el-form-item label="私有仓库">
@@ -193,17 +300,6 @@ defineExpose({
           </el-form-item>
         </template>
       </template>
-
-      <el-form-item label="最大重试">
-        <el-input-number v-model="form.maxRetries" :min="0" :max="5" />
-      </el-form-item>
-
-      <el-form-item label="重试策略">
-        <el-select v-model="form.retryStrategy">
-          <el-option label="线性" value="linear" />
-          <el-option label="指数退避" value="exponential" />
-        </el-select>
-      </el-form-item>
     </el-form>
 
     <template #footer>
@@ -216,48 +312,139 @@ defineExpose({
 </template>
 
 <style scoped>
-.image-picker {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.image-item {
+.image-section {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  gap: 24px;
   width: 100%;
 }
 
-.image-name {
+.image-input-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.image-library-section {
+  flex: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 500px;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.section-title {
   font-weight: 500;
   color: #0f172a;
+  font-size: 14px;
 }
 
-.image-url {
-  font-size: 12px;
-  color: #64748b;
-  font-family: monospace;
-}
-
-.selected-images {
+.controls {
   display: flex;
-  flex-wrap: wrap;
   gap: 8px;
-  min-height: 32px;
+  align-items: center;
+}
+
+.search-input {
+  width: 200px;
+}
+
+.sort-select {
+  width: 120px;
+}
+
+.manual-input {
+  width: 100%;
+}
+
+.table-container {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.image-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.image-table thead {
+  position: sticky;
+  top: 0;
+  background: #f8fafc;
+  z-index: 1;
+}
+
+.image-table th {
+  padding: 12px 16px;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.image-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+}
+
+.table-row:hover {
+  background-color: #f8fafc;
+}
+
+.url-cell {
+  font-family: monospace;
+  font-size: 11px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 300px;
 }
 
 .loading-text {
   text-align: center;
   color: #64748b;
-  padding: 40px 0;
+  padding: 60px 0;
 }
 
-@media (max-width: 640px) {
-  .image-picker {
-    grid-template-columns: 1fr;
+@media (max-width: 768px) {
+  .image-section {
+    flex-direction: column;
+  }
+
+  .image-library-section {
+    max-height: 400px;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+
+  .sort-select {
+    width: 100%;
+  }
+
+  .url-cell {
+    max-width: 150px;
   }
 }
 </style>

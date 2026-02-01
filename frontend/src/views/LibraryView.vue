@@ -2,7 +2,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { libraryApi } from '@/services/api'
-import type { LibraryImage, SaveImageRequest } from '@/types/api'
+import type { LibraryImage } from '@/types/api'
 
 const loading = ref(false)
 const libraryImages = ref<LibraryImage[]>([])
@@ -17,18 +17,15 @@ const showAddModal = ref(false)
 const selectedImages = ref<number[]>([])
 
 
-const form = ref<SaveImageRequest>({
-  name: '',
-  image: '',
-})
+const imageInput = ref('')
 
 const loadLibraryImages = async () => {
   try {
     loading.value = true
     const offset = (pagination.value.page - 1) * pagination.value.pageSize
-    const response = await libraryApi.list({ 
-      limit: pagination.value.pageSize, 
-      offset: offset 
+    const response = await libraryApi.list({
+      limit: pagination.value.pageSize,
+      offset: offset
     })
     libraryImages.value = response.images
     pagination.value.total = response.total || response.images.length
@@ -39,13 +36,46 @@ const loadLibraryImages = async () => {
   }
 }
 
+const extractDisplayName = (image: string): string => {
+  const trimmed = image.trim()
+  if (!trimmed) return ''
+  const parts = trimmed.split('/')
+  const lastPart = parts[parts.length - 1]
+  return lastPart || ''
+}
+
 const handleAdd = async () => {
+  const imageLines = imageInput.value.split('\n').map(line => line.trim()).filter(line => line.length > 0)
+
+  if (imageLines.length === 0) {
+    ElMessage.warning('请输入至少一个镜像地址')
+    return
+  }
+
   try {
-    await libraryApi.create(form.value)
-    ElMessage.success('镜像添加成功')
-    showAddModal.value = false
-    form.value = { name: '', image: '' }
-    loadLibraryImages()
+    let successCount = 0
+    let failCount = 0
+
+    for (const image of imageLines) {
+      try {
+        await libraryApi.create({
+          name: extractDisplayName(image),
+          image: image
+        })
+        successCount++
+      } catch (error) {
+        failCount++
+      }
+    }
+
+    if (successCount > 0) {
+      ElMessage.success(`成功添加 ${successCount} 个镜像${failCount > 0 ? `，失败 ${failCount} 个` : ''}`)
+      showAddModal.value = false
+      imageInput.value = ''
+      loadLibraryImages()
+    } else {
+      ElMessage.error('所有镜像添加失败')
+    }
   } catch (error) {
     ElMessage.error('添加镜像失败')
   }
@@ -175,13 +205,22 @@ onUnmounted(() => {
         />
       </div>
 
-     <el-dialog v-model="showAddModal" title="添加镜像" width="500px">
+     <el-dialog v-model="showAddModal" title="添加镜像" width="700px">
       <el-form label-width="100px">
-        <el-form-item label="显示名称" required>
-          <el-input v-model="form.name" placeholder="例如：Nginx" />
-        </el-form-item>
         <el-form-item label="镜像地址" required>
-          <el-input v-model="form.image" placeholder="docker.io/library/nginx:latest" />
+          <el-input
+            v-model="imageInput"
+            type="textarea"
+            :rows="8"
+            placeholder="每行输入一个镜像地址，例如：&#10;192.168.3.81/ips/spec-b1:v0&#10;docker.io/library/nginx:latest&#10;registry.cn-hangzhou.aliyuncs.com/library/redis:7"
+          />
+        </el-form-item>
+        <el-form-item label="提示">
+          <span style="color: #909399; font-size: 12px;">
+            • 每行一个镜像地址&#10;
+            • 显示名称将自动从镜像地址中提取（例如：spec-b1:v0）&#10;
+            • 支持批量添加多个镜像
+          </span>
         </el-form-item>
       </el-form>
       <template #footer>
