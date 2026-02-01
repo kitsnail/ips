@@ -160,9 +160,7 @@ onUnmounted(() => {
         >
           批量删除 ({{ selectedImages.length }})
         </el-button>
-        <el-button type="primary" @click="showAddModal = true">
-          添加镜像
-        </el-button>
+
       </div>
     </div>
     <el-table

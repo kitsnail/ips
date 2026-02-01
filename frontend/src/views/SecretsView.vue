@@ -132,9 +132,7 @@ onUnmounted(() => {
         >
           批量删除 ({{ selectedSecrets.length }})
         </el-button>
-        <el-button type="primary" @click="showAddModal = true">
-          添加认证
-        </el-button>
+
       </div>
     </div>
     <el-table

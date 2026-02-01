@@ -1,19 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { taskApi } from '@/services/api'
 import type { Task } from '@/types/api'
-import TaskDetailModal from '@/components/TaskDetailModal.vue'
-import CreateTaskModal from '@/components/CreateTaskModal.vue'
 
 const tasks = ref<Task[]>([])
 const loading = ref(false)
-const showCreateModal = ref(false)
-const showDetailModal = ref(false)
-const selectedTask = ref<Task | null>(null)
 const selectedTasks = ref<Task[]>([])
-const createModalRef = ref<InstanceType<typeof CreateTaskModal> | null>(null)
-
 
 // Pagination state
 const pagination = ref({
@@ -37,22 +30,6 @@ const refreshTasks = async () => {
   } finally {
     loading.value = false
   }
-}
-
-const handleCreateSuccess = () => {
-  refreshTasks()
-}
-
-// Watch showCreateModal to call handleOpen when it opens
-watch(showCreateModal, (newVal) => {
-  if (newVal && createModalRef.value) {
-    createModalRef.value.handleOpen()
-  }
-})
-
-const showTaskDetail = (task: Task) => {
-  selectedTask.value = task
-  showDetailModal.value = true
 }
 
 const handlePageChange = (page: number) => {
@@ -93,7 +70,7 @@ const handleBulkDelete = async () => {
     ElMessage.warning('请选择要删除的任务')
     return
   }
-
+  
   try {
     await ElMessageBox.confirm(
       `确定要删除选中的 ${selectedTasks.value.length} 个任务吗？`,
@@ -104,7 +81,7 @@ const handleBulkDelete = async () => {
         type: 'warning',
       }
     )
-
+    
     const deletePromises = selectedTasks.value.map(task => taskApi.delete(task.taskId))
     await Promise.all(deletePromises)
     
@@ -119,8 +96,6 @@ const handleBulkDelete = async () => {
   }
 }
 
-
-
 onMounted(() => {
   refreshTasks()
 })
@@ -132,83 +107,74 @@ onUnmounted(() => {
 
 <template>
    <div class="tasks">
-     <div class="header">
-       <h2>任务管理</h2>
-       <div class="header-right">
-         <el-button 
-           v-if="selectedTasks.length > 0"
-           type="danger" 
-           @click="handleBulkDelete"
-           :disabled="selectedTasks.length === 0"
-         >
-           批量删除 ({{ selectedTasks.length }})
-         </el-button>
-         <el-button type="primary" @click="showCreateModal = true">新建任务</el-button>
-       </div>
-     </div>
-     <el-table 
-       :data="tasks" 
-       v-loading="loading" 
-       style="width: 100%"
-       @selection-change="selectedTasks = $event"
-     >
-       <el-table-column type="selection" width="55" />
-       <el-table-column prop="taskId" label="任务ID" width="180" />
-       <el-table-column prop="status" label="状态" width="100">
-         <template #default="{ row }">
-           <el-tag :type="row.status === 'completed' ? 'success' : row.status === 'failed' ? 'danger' : 'info'">
-             {{ row.status }}
-           </el-tag>
-         </template>
-       </el-table-column>
-       <el-table-column prop="images" label="镜像">
-         <template #default="{ row }">
-           {{ row.images[0] }}
-           <span v-if="row.images.length > 1">+{{ row.images.length - 1 }}</span>
-         </template>
-       </el-table-column>
-       <el-table-column prop="progress.percentage" label="进度" width="120">
-         <template #default="{ row }">
-           {{ row.progress?.percentage?.toFixed(1) || 0 }}%
-         </template>
-       </el-table-column>
-       <el-table-column prop="createdAt" label="创建时间" width="180">
-         <template #default="{ row }">
-           {{ new Date(row.createdAt).toLocaleString() }}
-         </template>
-       </el-table-column>
-       <el-table-column label="操作" width="200">
-         <template #default="{ row: task }">
-           <el-button size="small" @click="showTaskDetail(task)">详情</el-button>
-           <el-button size="small" type="danger" @click="handleDelete(task)">删除</el-button>
-         </template>
-       </el-table-column>
-      </el-table>
+      <div class="header">
+        <h2>任务管理</h2>
+        <div class="header-right">
+          <el-button 
+            v-if="selectedTasks.length > 0"
+            type="danger" 
+            @click="handleBulkDelete"
+            :disabled="selectedTasks.length === 0"
+          >
+            批量删除 ({{ selectedTasks.length }})
+          </el-button>
 
-      <!-- Pagination -->
-      <div style="display: flex; justify-content: center; margin-top: 20px;">
-        <el-pagination
-          v-model:current-page="pagination.page"
-          v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 20, 50]"
-          :total="pagination.total"
-          layout="sizes, prev, pager, next, total"
-          :background="true"
-          @size-change="handlePageSizeChange"
-          @current-change="handlePageChange"
-        />
+        </div>
       </div>
-
-     <CreateTaskModal
-       v-model:visible="showCreateModal"
-       @success="handleCreateSuccess"
-     />
-
-     <TaskDetailModal
-       :visible="showDetailModal"
-       :task="selectedTask"
-       @update:visible="(val) => showDetailModal = val"
-     />
+     <el-table 
+        :data="tasks" 
+        v-loading="loading" 
+        style="width: 100%"
+        @selection-change="selectedTasks = $event"
+      >
+        <el-table-column type="selection" width="55" />
+        <el-table-column prop="taskId" label="任务ID" width="180" />
+        <el-table-column prop="status" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.status === 'completed' ? 'success' : row.status === 'failed' ? 'danger' : 'info'">
+              {{ row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="images" label="镜像">
+          <template #default="{ row }">
+            {{ row.images[0] }}
+            <span v-if="row.images.length > 1">+{{ row.images.length - 1 }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="progress.percentage" label="进度" width="120">
+          <template #default="{ row }">
+            {{ row.progress?.percentage?.toFixed(1) || 0 }}%
+          </template>
+        </el-table-column>
+        <el-table-column prop="createdAt" label="创建时间" width="180">
+          <template #default="{ row }">
+            {{ new Date(row.createdAt).toLocaleString() }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200">
+          <template #default="{ row: task }">
+            <router-link :to="`/tasks/${task.taskId}`">
+              <el-button size="small">详情</el-button>
+            </router-link>
+            <el-button size="small" type="danger" @click="handleDelete(task)">删除</el-button>
+          </template>
+        </el-table-column>
+       </el-table>
+   
+       <!-- Pagination -->
+       <div style="display: flex; justify-content: center; margin-top: 20px;">
+         <el-pagination
+           v-model:current-page="pagination.page"
+           v-model:page-size="pagination.pageSize"
+           :page-sizes="[10, 20, 50]"
+           :total="pagination.total"
+           layout="sizes, prev, pager, next, total"
+           :background="true"
+           @size-change="handlePageSizeChange"
+           @current-change="handlePageChange"
+         />
+       </div>
    </div>
 </template>
 

@@ -265,7 +265,6 @@ onUnmounted(() => {
          >
            批量删除 ({{ selectedTasks.length }})
          </el-button>
-         <el-button type="primary" @click="showCreateModal = true">新建定时任务</el-button>
        </div>
      </div>
      <el-table 

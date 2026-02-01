@@ -127,30 +127,19 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="scheduled-history">
-    <div class="page-header">
-      <h2>定时任务执行历史</h2>
-      <div class="header-actions">
-        <router-link to="/scheduled" class="back-link">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M19 12H5m7 7-7 7m0-14l1.5 1.5M13 11l1.5 1.5"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-          返回定时任务
-        </router-link>
+  <div class="max-w-[1200px] mx-auto py-6 px-4 sm:px-6 lg:px-8">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-bold text-slate-900 dark:text-white">定时任务执行历史</h2>
+      <div class="flex gap-3">
+
       </div>
     </div>
 
     <!-- Filters -->
-    <div class="filters-section">
-      <div class="filter-item">
-        <span class="filter-label">状态:</span>
-        <el-select v-model="statusFilter" class="filter-select" @change="handleStatusFilter">
+    <div class="mb-4 flex gap-4 items-center">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-medium text-slate-600 dark:text-slate-400">状态:</span>
+        <el-select v-model="statusFilter" class="w-[200px]" @change="handleStatusFilter">
           <el-option
             v-for="option in statusOptions"
             :key="option.value"
@@ -162,23 +151,24 @@ onMounted(() => {
     </div>
 
     <!-- Executions Table -->
-    <div class="table-container">
+    <div class="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-sm border border-slate-200 dark:border-slate-700">
       <el-table
         :data="executions"
         v-loading="loading"
         style="width: 100%"
+        :header-cell-style="{ background: 'transparent', color: 'inherit' }"
       >
         <el-table-column prop="id" label="执行ID" width="100" />
         <el-table-column prop="taskId" label="任务ID" width="180">
           <template #default="{ row }">
-            <span class="task-link" @click="viewTaskDetail(row.id)">
+            <span class="text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 font-mono cursor-pointer underline decoration-cyan-500/30 hover:decoration-cyan-500 transition-all" @click="viewTaskDetail(row.id)">
               {{ getTaskName(row.taskId) }}
             </span>
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.status)">
+            <el-tag :type="getStatusType(row.status)" effect="light" class="!border-0">
               {{ getStatusLabel(row.status) }}
             </el-tag>
           </template>
@@ -186,29 +176,31 @@ onMounted(() => {
         <el-table-column prop="durationSeconds" label="耗时" width="120">
           <template #default="{ row }">
             <el-tooltip :content="`${row.durationSeconds}秒`">
-              {{ formatDuration(row.durationSeconds) }}
+              <span class="font-mono text-slate-600 dark:text-slate-400">{{ formatDuration(row.durationSeconds) }}</span>
             </el-tooltip>
           </template>
         </el-table-column>
         <el-table-column prop="startedAt" label="开始时间" width="180">
           <template #default="{ row }">
-            {{ new Date(row.startedAt).toLocaleString() }}
+            <span class="text-slate-600 dark:text-slate-400 text-sm">{{ new Date(row.startedAt).toLocaleString() }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="finishedAt" label="结束时间" width="180">
           <template #default="{ row }">
-            {{ row.finishedAt ? new Date(row.finishedAt).toLocaleString() : '-' }}
+            <span class="text-slate-600 dark:text-slate-400 text-sm">{{ row.finishedAt ? new Date(row.finishedAt).toLocaleString() : '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column prop="errorMessage" label="错误信息" min-width="200">
           <template #default="{ row }">
-            <span class="error-message">{{ row.errorMessage || '-' }}</span>
+            <span class="text-xs text-red-500 dark:text-red-400 font-mono" v-if="row.errorMessage">{{ row.errorMessage }}</span>
+            <span class="text-slate-400" v-else>-</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
             <el-button
               type="primary"
+              link
               size="small"
               @click="viewTaskDetail(row.id)"
             >
@@ -219,7 +211,7 @@ onMounted(() => {
       </el-table>
 
       <!-- Pagination -->
-      <div class="pagination-wrapper">
+      <div class="mt-6 flex justify-center">
         <el-pagination
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"
@@ -234,143 +226,15 @@ onMounted(() => {
     </div>
 
     <!-- Empty State -->
-    <el-empty
-      v-if="!loading && executions.length === 0"
-      description="暂无执行历史记录"
-      :image-size="120"
-    />
+    <div v-if="!loading && executions.length === 0" class="mt-8 flex justify-center">
+       <el-empty
+         description="暂无执行历史记录"
+         :image-size="120"
+       />
+    </div>
   </div>
 </template>
 
 <style scoped>
-.scheduled-history {
-  padding: 0;
-}
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.page-header h2 {
-  font-size: 24px;
-  font-weight: 600;
-  color: #0f172a;
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.back-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #64748b;
-  text-decoration: none;
-  font-size: 14px;
-  transition: color 0.2s;
-}
-
-.back-link:hover {
-  color: #0891b2;
-}
-
-.back-link svg {
-  width: 18px;
-  height: 18px;
-}
-
-.filters-section {
-  margin-bottom: 16px;
-  display: flex;
-  gap: 16px;
-}
-
-.filter-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.filter-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #64748b;
-}
-
-.filter-select {
-  width: 200px;
-}
-
-.table-container {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-}
-
-.pagination-wrapper {
-  margin-top: 24px;
-  display: flex;
-  justify-content: center;
-}
-
-.task-link {
-  color: #0891b2;
-  cursor: pointer;
-  font-family: monospace;
-  font-weight: 500;
-  transition: color 0.2s;
-}
-
-.task-link:hover {
-  color: #0e7490;
-  text-decoration: underline;
-}
-
-.error-message {
-  color: #64748b;
-  font-size: 13px;
-}
-
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .page-header h2 {
-    color: #f8fafc;
-  }
-
-  .back-link {
-    color: #94a3b8;
-  }
-
-  .back-link:hover {
-    color: #22d3ee;
-  }
-
-  .filter-label {
-    color: #94a3b8;
-  }
-
-  .table-container {
-    background: #1e293b;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-  }
-
-  .task-link {
-    color: #22d3ee;
-  }
-
-  .task-link:hover {
-    color: #06b6d4;
-  }
-
-  .error-message {
-    color: #94a3b8;
-  }
-}
+/* Scoped styles replaced by Tailwind */
 </style>

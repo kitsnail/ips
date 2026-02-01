@@ -6,11 +6,24 @@ import Sidebar from '@/components/Sidebar.vue'
 import Breadcrumb from '@/components/Breadcrumb.vue'
 
 const router = useRouter()
-const { user, isAdmin, loadUser } = useAuth()
+const { user, loadUser } = useAuth()
 
-const showMobileMenu = ref(false)
+const collapsed = ref(false)
 const darkMode = ref(false)
 const showShortcutsDialog = ref(false)
+
+// Load sidebar state
+const loadSidebarState = () => {
+    const saved = localStorage.getItem('sidebar_collapsed')
+    if (saved !== null) {
+        collapsed.value = saved === 'true'
+    }
+}
+
+const toggleSidebar = () => {
+    collapsed.value = !collapsed.value
+    localStorage.setItem('sidebar_collapsed', String(collapsed.value))
+}
 
 // Load dark mode preference
 const loadDarkMode = () => {
@@ -37,117 +50,56 @@ const applyDarkMode = () => {
   }
 }
 
-const toggleMobileMenu = () => {
-  showMobileMenu.value = !showMobileMenu.value
-}
-
 const logout = () => {
   localStorage.removeItem('ips_token')
   localStorage.removeItem('ips_user')
-  router.push('/')
+  router.push('/login')
 }
 
-// Keyboard shortcuts
+// Shortcuts logic preserved
 const shortcuts = [
-  {
-    key: 'Ctrl/Cmd + N',
-    label: '创建任务',
-    action: () => router.push('/tasks/create'),
-    category: '任务',
-  },
-  {
-    key: 'Ctrl/Cmd + Shift + T',
-    label: '任务列表',
-    action: () => router.push('/tasks'),
-    category: '任务',
-  },
-  {
-    key: 'Ctrl/Cmd + S',
-    label: '定时任务',
-    action: () => router.push('/scheduled'),
-    category: '定时',
-  },
-  {
-    key: 'Ctrl/Cmd + L',
-    label: '镜像库',
-    action: () => router.push('/library'),
-    category: '镜像',
-  },
-  {
-    key: 'Ctrl/Cmd + E',
-    label: '仓库认证',
-    action: () => router.push('/secrets'),
-    category: '镜像',
-  },
-  {
-    key: 'Ctrl/Cmd + A',
-    label: '系统设置',
-    action: () => router.push('/admin/settings'),
-    category: '系统',
-  },
-  {
-    key: 'Ctrl/Cmd + G',
-    label: '用户管理',
-    action: () => router.push('/admin/users'),
-    category: '系统',
-  },
-  {
-    key: 'Ctrl/Cmd + D',
-    label: '系统日志',
-    action: () => router.push('/admin/logs'),
-    category: '系统',
-  },
-  {
-    key: 'Ctrl/Cmd + /',
-    label: '切换主题',
-    action: toggleDarkMode,
-    category: '系统',
-  },
-  {
-    key: 'Escape',
-    label: '返回上级',
-    action: () => router.back(),
-    category: '导航',
-  },
+  { key: 'Ctrl/Cmd + N', label: '创建任务', action: () => router.push('/tasks/create'), category: '任务' },
+  { key: 'Ctrl/Cmd + Shift + T', label: '任务列表', action: () => router.push('/tasks'), category: '任务' },
+  { key: 'Ctrl/Cmd + S', label: '定时任务', action: () => router.push('/scheduled'), category: '定时' },
+  { key: 'Ctrl/Cmd + L', label: '镜像库', action: () => router.push('/library'), category: '镜像' },
+  { key: 'Ctrl/Cmd + E', label: '仓库认证', action: () => router.push('/secrets'), category: '镜像' },
+  { key: 'Ctrl/Cmd + A', label: '系统设置', action: () => router.push('/admin/settings'), category: '系统' },
+  { key: 'Ctrl/Cmd + G', label: '用户管理', action: () => router.push('/admin/users'), category: '系统' },
+  { key: 'Ctrl/Cmd + D', label: '系统日志', action: () => router.push('/admin/logs'), category: '系统' },
+  { key: 'Ctrl/Cmd + /', label: '切换主题', action: toggleDarkMode, category: '系统' },
+  { key: 'Escape', label: '返回上级', action: () => router.back(), category: '导航' },
 ]
 
-const handleShortcut = (shortcut: typeof shortcuts[0]) => {
+const handleShortcut = (shortcut: any) => {
   shortcut.action()
   showShortcutsDialog.value = false
 }
 
 const handleKeydown = (event: KeyboardEvent) => {
-  // Ignore if user is typing in input field
   const target = event.target as HTMLElement
-  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
-    return
-  }
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
 
-  // Check for modifier keys
   const isCtrlCmd = event.ctrlKey || event.metaKey
   const isShift = event.shiftKey
 
-  // Find matching shortcut
   for (const shortcut of shortcuts) {
-    const [baseKey, ...modifiers] = shortcut.key.split('+')
-    const keyMatches = event.key === baseKey
-    const modifiersMatch = modifiers.every(mod => {
-      if (mod === 'Ctrl') return isCtrlCmd
-      if (mod === 'Cmd') return isCtrlCmd
-      if (mod === 'Shift') return isShift
-      return false
-    })
-
-    if (keyMatches && modifiersMatch) {
-      event.preventDefault()
-      handleShortcut(shortcut)
-      return
-    }
+     const keys = shortcut.key.split(' + ')
+     const mainKey = keys[keys.length - 1]
+     const needsShift = keys.includes('Shift')
+     const needsCtrlCmd = keys.some(k => k.includes('Ctrl') || k.includes('Cmd'))
+     
+     if (mainKey && event.key.toLowerCase() === mainKey.toLowerCase() && 
+         isShift === needsShift && 
+         isCtrlCmd === needsCtrlCmd) {
+        event.preventDefault()
+        handleShortcut(shortcut)
+        return
+     }
   }
 }
 
 const groupedShortcuts = computed(() => {
-  const grouped: Record<string, Array<{ key: string; label: string; action: string | (() => void); category: string }>> = {}
+  const grouped: Record<string, typeof shortcuts> = {}
   shortcuts.forEach(shortcut => {
     const category = shortcut.category
     if (!grouped[category]) {
@@ -165,594 +117,130 @@ const initials = computed(() => {
 onMounted(() => {
   loadUser()
   loadDarkMode()
+  loadSidebarState()
   window.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown)
 })
-
-defineExpose({
-  toggleDarkMode,
-})
 </script>
 
 <template>
-  <div class="layout" :class="{ dark: darkMode }">
-    <!-- Sidebar (Desktop) -->
-    <Sidebar class="sidebar-desktop" />
+  <el-container class="h-screen w-full bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+    <!-- Sidebar -->
+    <el-aside 
+      :width="collapsed ? '64px' : '260px'" 
+      class="border-r border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 transition-all duration-300 overflow-hidden z-20"
+    >
+      <Sidebar :collapsed="collapsed" />
+    </el-aside>
 
-    <!-- Mobile Menu Overlay -->
-    <div v-if="showMobileMenu" class="mobile-overlay" @click="toggleMobileMenu"></div>
-
-    <!-- Mobile Menu -->
-    <div v-if="showMobileMenu" class="mobile-menu">
-      <div class="mobile-menu-header">
-        <div class="logo">IPS</div>
-        <button class="close-btn" @click="toggleMobileMenu">
-          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M6 18L18 6M6 6l12 12M6 18M6 6l12 12M6 18l6M6 6l-6-6M6l-6 6M12 12M6 12z"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
-      <nav class="mobile-nav">
-        <router-link to="/dashboard" @click="toggleMobileMenu">概览</router-link>
-        <router-link to="/tasks" @click="toggleMobileMenu">任务管理</router-link>
-        <router-link to="/scheduled" @click="toggleMobileMenu">定时任务</router-link>
-        <router-link to="/library" @click="toggleMobileMenu">镜像库</router-link>
-        <router-link to="/secrets" @click="toggleMobileMenu">仓库认证</router-link>
-        <router-link
-          v-if="isAdmin"
-          to="/admin/settings"
-          @click="toggleMobileMenu"
-          class="admin-link"
-        >
-          系统设置
-        </router-link>
-        <router-link
-          v-if="isAdmin"
-          to="/admin/users"
-          @click="toggleMobileMenu"
-          class="admin-link"
-        >
-          用户管理
-        </router-link>
-        <router-link
-          v-if="isAdmin"
-          to="/admin/logs"
-          @click="toggleMobileMenu"
-          class="admin-link"
-        >
-          系统日志
-        </router-link>
-         </nav>
-    </div>
-
-    <!-- Main Content -->
-    <div class="main-content">
+    <el-container class="min-w-0 flex flex-col">
       <!-- Top Bar -->
-      <header class="top-bar">
-        <div class="top-bar-left">
-          <button class="mobile-menu-btn" @click="toggleMobileMenu">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M4 6h16M4 12h.01M21 12a10 10H5a10 10 0 00 11h-4M15 11H4l-10 10 0 000-1z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </button>
-          <Breadcrumb />
-        </div>
+      <el-header class="!h-16 !p-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-gray-200 dark:border-slate-800 sticky top-0 z-10">
+        <div class="h-full px-6 flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <!-- Sidebar Toggle (Desktop) -->
+            <button 
+              class="hidden lg:flex p-2 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              @click="toggleSidebar"
+            >
+               <svg v-if="collapsed" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+               <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path></svg>
+            </button>
+            
+            <!-- Mobile Toggle -->
+            <button class="lg:hidden p-2 text-slate-500 hover:bg-slate-100 rounded-lg">
+               <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <Breadcrumb />
+          </div>
 
-        <div class="top-bar-right">
-          <button
-            class="theme-toggle"
-            @click="toggleDarkMode"
-            :title="darkMode ? '切换到浅色模式' : '切换到深色模式'"
-          >
-            <svg v-if="darkMode" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M12 3v1m0 2a2 2 0 00-2v1m1.42 10 0 01.58 0 11.42 0 011 0zm-1 13.42 0 000-2-2h13a2 2 0 00-2v1.58a.2 2 0 011.0zm-1 13.42 0 000-2-2h13a2 2 0 0 0-2v1.58a.2 2 0 00-2v1.58a.2 2 0 011.0z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M20 7h-9M20 11h-9M20 15h-9M3 7h2v10H3V7zm0 0l2-2M3 17l2 2 0 00-2v-1M19 9 10.01 10.01 0 2 9.9.0 00-10.01-2v1.9 10 02 0z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </button>
-          <el-dropdown trigger="click" class="user-dropdown">
-            <div class="user-info">
-              <div class="user-avatar">{{ initials }}</div>
-              <span class="username">{{ user?.username }}</span>
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M6 9l6 6m0 0l-6 6m6-6H6m12 0H12m-6 6h.01M18 12h.01M12 6h.01M18 6h.01M6 12h12"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </div>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="showShortcutsDialog = true">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M13 10V3L4 14h7v7l9-11h-7z"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
-                  </svg>
-                  <span>快捷键</span>
-                </el-dropdown-item>
-                <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
-      </header>
+          <div class="flex items-center gap-4">
+            <!-- Theme Toggle -->
+            <button 
+              class="p-2 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 rounded-lg transition-colors"
+              @click="toggleDarkMode"
+              title="切换主题"
+            >
+              <svg v-if="darkMode" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+            </button>
 
-      <!-- Page Content -->
-      <main class="page-content">
-        <router-view></router-view>
-      </main>
-    </div>
+            <!-- User Dropdown -->
+            <el-dropdown trigger="click" class="cursor-pointer">
+              <div class="flex items-center gap-3 hover:bg-slate-100 dark:hover:bg-slate-800 py-1.5 px-3 rounded-lg transition-colors border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+                <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-500 flex items-center justify-center text-white text-sm font-bold shadow-sm">
+                  {{ initials }}
+                </div>
+                <span class="text-sm font-medium text-slate-700 dark:text-slate-200">{{ user?.username }}</span>
+                <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu class="min-w-[160px]">
+
+                  <el-dropdown-item divided @click="logout" class="text-red-500 hover:!text-red-600 hover:!bg-red-50">
+                    <div class="flex items-center gap-2">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path></svg>
+                      <span>退出登录</span>
+                    </div>
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </div>
+      </el-header>
+
+      <!-- Main Content -->
+      <el-main class="!p-6 overflow-y-auto relative scroll-smooth">
+         <router-view v-slot="{ Component }">
+            <transition name="fade-slide" mode="out-in">
+              <component :is="Component" />
+            </transition>
+         </router-view>
+      </el-main>
+    </el-container>
 
     <!-- Keyboard Shortcuts Dialog -->
-    <el-dialog v-model="showShortcutsDialog" title="快捷键" width="800px">
-      <div class="shortcuts-container">
-        <div
-          v-for="(group, category) in Object.entries(groupedShortcuts)"
-          :key="category"
-          class="shortcuts-group"
-        >
-          <div class="group-title">{{ category }}</div>
-          <div class="shortcuts-list">
-            <div
-              v-for="(shortcut, index) in group"
-              :key="index"
-              class="shortcut-item"
-              @click="handleShortcut(shortcut as any)"
-            >
-              <div class="shortcut-keys">
-                <span
-                  v-for="(key, keyIndex) in (shortcut as any).key.split('+')"
-                  :key="keyIndex"
-                  class="key-badge"
-                >
-                  {{ key }}
-                </span>
-              </div>
-              <span class="shortcut-label">{{ (shortcut as any).label }}</span>
-              <span class="shortcut-description"></span>
+    <el-dialog v-model="showShortcutsDialog" title="快捷键速查" width="600px" class="rounded-xl">
+      <div class="grid grid-cols-2 gap-6 p-2">
+        <div v-for="(group, category) in groupedShortcuts" :key="category">
+          <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{{ category }}</h3>
+          <div class="space-y-2">
+            <div v-for="(shortcut, idx) in group" :key="idx" 
+                 class="flex items-center justify-between p-2 rounded hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer group"
+                 @click="handleShortcut(shortcut)">
+               <span class="text-sm text-slate-700 dark:text-slate-300 group-hover:text-blue-600 transition-colors">{{ shortcut.label }}</span>
+               <div class="flex gap-1">
+                 <kbd v-for="k in shortcut.key.split('+')" :key="k" class="px-2 py-1 text-xs font-mono bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded text-slate-500 dark:text-slate-400 min-w-[24px] text-center shadow-sm">
+                   {{ k.trim() }}
+                 </kbd>
+               </div>
             </div>
           </div>
         </div>
       </div>
     </el-dialog>
-  </div>
+  </el-container>
 </template>
 
+
 <style scoped>
-.layout {
-  min-height: 100vh;
-  background: #f8fafc;
-  background-image: radial-gradient(#cffafe 1px, transparent 1px);
-  background-size: 24px 24px;
-  transition: background-color 0.3s;
+/* Transition Utility */
+.fade-slide-enter-active,
+.fade-slide-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
-.layout.dark {
-  background: #020617;
-  background-image: radial-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px);
+.fade-slide-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
 }
 
-/* Sidebar (Desktop) */
-.sidebar-desktop {
-  display: none;
-}
-
-@media (min-width: 1024px) {
-  .sidebar-desktop {
-    display: block;
-  }
-}
-
-/* Mobile Menu Overlay */
-.mobile-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 1000;
-}
-
-.mobile-menu {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: #ffffff;
-  z-index: 1001;
-  display: flex;
-  flex-direction: column;
-  animation: slideIn 0.3s ease;
-}
-
-@keyframes slideIn {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0%);
-  }
-}
-
-.mobile-menu-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 64px;
-  padding: 0 20px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.mobile-menu-header .logo {
-  font-size: 20px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.close-btn {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 8px;
-  color: #64748b;
-  transition: all 0.2s;
-}
-
-.close-btn:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.close-btn svg {
-  width: 24px;
-  height: 24px;
-}
-
-.mobile-nav {
-  flex: 1;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.mobile-nav a {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #64748b;
-  text-decoration: none;
-  font-size: 14px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  transition: color 0.2s;
-  border: 1px solid transparent;
-}
-
-.mobile-nav a:hover {
-  background: #e0f2fe;
-  color: #0f172a;
-}
-
-.mobile-nav a.router-link-active {
-  background: rgba(34, 211, 238, 0.15);
-  color: #22d3ee;
-}
-
-.mobile-nav .admin-link {
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.mobile-nav .admin-link.router-link-active {
-  background: rgba(34, 211, 238, 0.15);
-  color: #22d3ee;
-}
-
-/* Main Content */
-.main-content {
-  flex: 1;
-  min-width: 0;
-}
-
-/* Top Bar */
-.top-bar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 24px;
-  transition: background-color 0.3s;
-}
-
-.top-bar-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.mobile-menu-btn {
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  border-radius: 8px;
-  color: #64748b;
-  transition: all 0.2s;
-}
-
-.mobile-menu-btn:hover {
-  background: #f1f5f9;
-  color: #0f172a;
-}
-
-.mobile-menu-btn svg {
-  width: 24px;
-  height: 24px;
-}
-
-/* User Dropdown */
-.user-dropdown {
-  cursor: pointer;
-}
-
-.user-info {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.user-avatar {
-  width: 32px;
-  height: 32px;
-  background: #3b82f6;
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.username {
-  font-size: 14px;
-  font-weight: 500;
-  color: #0f172a;
-  white-space: nowrap;
-}
-
-.dropdown-arrow {
-  width: 16px;
-  height: 16px;
-  color: #64748b;
-}
-
-/* Keyboard Shortcuts Dialog */
-.shortcuts-container {
-  max-height: 600px;
-  overflow-y: auto;
-}
-
-.shortcuts-group {
-  margin-bottom: 24px;
-}
-
-.shortcuts-group:last-child {
-  margin-bottom: 0;
-}
-
-.group-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #0f172a;
-  margin-bottom: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e2e8f0;
-}
-
-.shortcuts-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
-}
-
-.shortcut-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.shortcut-item:hover {
-  background: #e0f2fe;
-  border-color: #0891b2;
-}
-
-.shortcut-keys {
-  display: flex;
-  gap: 4px;
-}
-
-.key-badge {
-  padding: 4px 8px;
-  background: #0891b2;
-  color: white;
-  border-radius: 4px;
-  font-family: 'Monaco', 'Consolas', monospace;
-  font-size: 13px;
-  font-weight: 600;
-  min-width: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.shortcut-label {
-  flex: 1;
-  font-size: 14px;
-  font-weight: 500;
-  color: #0f172a;
-}
-
-.shortcut-description {
-  flex: 1;
-  font-size: 13px;
-  color: #64748b;
-  text-align: right;
-}
-
-.menu-icon {
-  width: 16px;
-  height: 16px;
-  color: #0891b2;
-}
-
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .top-bar {
-    background: rgba(15, 23, 42, 0.9);
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .mobile-menu {
-    background: #0f172a;
-  }
-
-  .mobile-menu-header {
-    border-bottom-color: #334155;
-  }
-
-  .close-btn:hover {
-    background: #334155;
-    color: #f8fafc;
-  }
-
-  .mobile-nav a {
-    color: #94a3b8;
-  }
-
-  .mobile-nav a:hover {
-    background: #1e293b;
-    color: #f8fafc;
-  }
-
-  .mobile-nav a.router-link-active {
-    background: rgba(34, 211, 238, 0.15);
-    color: #22d3ee;
-  }
-
-  .mobile-nav .admin-link.router-link-active {
-    background: rgba(34, 211, 238, 0.15);
-    color: #22d3ee;
-  }
-
-  .user-avatar {
-    background: #3b82f6;
-  }
-
-  .username {
-    color: #f8fafc;
-  }
-
-  .dropdown-arrow {
-    color: #94a3b8;
-  }
-
-  .shortcuts-container {
-    background: #1e293b;
-    border: 1px solid #334155;
-  }
-
-  .group-title {
-    color: #f8fafc;
-    border-bottom-color: #334155;
-  }
-
-  .shortcut-item {
-    background: #0f172a;
-    border-color: #334155;
-  }
-
-  .shortcut-item:hover {
-    background: #1e293b;
-    border-color: #22d3ee;
-  }
-
-  .key-badge {
-    background: #22d3ee;
-  }
-
-  .shortcut-label {
-    color: #f8fafc;
-  }
-
-  .shortcut-description {
-    color: #94a3b8;
-  }
-
-  .menu-icon {
-    color: #22d3ee;
-  }
+.fade-slide-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
 }
 </style>

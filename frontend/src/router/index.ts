@@ -4,12 +4,18 @@ const router = createRouter({
   history: createWebHistory('/web/'),
   routes: [
     {
+      path: '/login',
+      name: 'Login',
+      component: () => import('@/views/LoginView.vue'),
+    },
+    {
       path: '/',
-      component: () => import('@/App.vue'),
+      redirect: '/dashboard',
     },
     {
       path: '/dashboard',
       component: () => import('@/components/Layout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -20,6 +26,7 @@ const router = createRouter({
     {
       path: '/tasks',
       component: () => import('@/components/Layout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -34,6 +41,7 @@ const router = createRouter({
     {
       path: '/scheduled',
       component: () => import('@/components/Layout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -48,6 +56,7 @@ const router = createRouter({
     {
       path: '/library',
       component: () => import('@/components/Layout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -62,6 +71,7 @@ const router = createRouter({
     {
       path: '/secrets',
       component: () => import('@/components/Layout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -76,6 +86,7 @@ const router = createRouter({
     {
       path: '/admin',
       component: () => import('@/components/Layout.vue'),
+      meta: { requiresAuth: true },
       children: [
         {
           path: '',
@@ -96,6 +107,28 @@ const router = createRouter({
       ],
     },
   ],
+})
+
+router.beforeEach((to, _from, next) => {
+  const token = localStorage.getItem('ips_token')
+
+  if (to.matched.some(record => record.meta.requiresAuth)) {
+    if (!token) {
+      next({
+        path: '/login',
+        query: { redirect: to.fullPath },
+      })
+    } else {
+      next()
+    }
+  } else {
+    // Prevent logged-in users from visiting login page
+    if (to.path === '/login' && token) {
+      next('/dashboard')
+    } else {
+      next()
+    }
+  }
 })
 
 export default router

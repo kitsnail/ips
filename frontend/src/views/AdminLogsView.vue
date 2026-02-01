@@ -347,7 +347,7 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 24px;
   padding: 16px 24px;
-  background: white;
+  background: transparent;
   border-radius: 12px;
   margin-bottom: 24px;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -381,7 +381,7 @@ onUnmounted(() => {
 
 /* Logs Container */
 .logs-container {
-  background: white;
+  background: transparent;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -469,7 +469,7 @@ onUnmounted(() => {
 /* Detail Panel */
 .log-detail-panel {
   margin-left: 24px;
-  background: white;
+  background: transparent;
   border-radius: 12px;
   padding: 24px;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);

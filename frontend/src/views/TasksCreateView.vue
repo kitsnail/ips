@@ -229,9 +229,7 @@ const loadLibraryImages = async () => {
   }
 }
 
-const clearSearch = () => {
-  searchText.value = ''
-}
+
 
 const loadSecrets = async () => {
   try {
@@ -290,95 +288,66 @@ const submit = async () => {
   }
 }
 
-const cancel = () => {
-  router.back()
-}
+
 </script>
 
 <template>
-  <div class="task-create">
-    <div class="page-header">
-      <h1>创建镜像预热任务</h1>
-      <div class="header-actions">
-        <el-button @click="cancel">取消</el-button>
+  <div class="max-w-[1600px] mx-auto p-6 space-y-8">
+    <!-- Page Header -->
+    <div class="flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">创建镜像预热任务</h1>
+      <div class="flex gap-3">
+
         <el-button type="primary" @click="submit" :loading="loading">
           创建任务
         </el-button>
       </div>
     </div>
 
-    <div class="content-wrapper">
+    <div class="flex flex-col xl:flex-row gap-6 items-start">
       <!-- Left: Form Section -->
-      <div class="form-section">
-        <el-form label-width="120px">
+      <div class="flex-1 w-full space-y-6">
         <!-- 镜像配置 -->
-        <div class="form-section">
-          <div class="section-title">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M20 7h-9M20 11h-9M20 15h-9M3 7h2v10H3V7zm0 0l2-2M3 17l2 2"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            镜像配置
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-sm border border-slate-100 dark:border-slate-700/50">
+          <div class="flex items-center justify-between text-base font-semibold text-slate-900 dark:text-slate-100 mb-6 pb-3 border-b border-slate-200 dark:border-slate-700 gap-3">
+            <div class="flex items-center gap-3">
+              <svg class="w-5 h-5 text-cyan-500" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M20 7h-9M20 11h-9M20 15h-9M3 7h2v10H3V7zm0 0l2-2M3 17l2 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              镜像配置
+            </div>
           </div>
 
-          <div class="selected-images">
-            <div v-if="selectedImages.length === 0" class="empty-state">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M20 7h-9M20 11h-9M20 15h-9M3 7h2v10H3V7zm0 0l2-2M3 17l2 2"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
+          <div class="min-h-[120px]">
+            <div v-if="selectedImages.length === 0" class="flex flex-col items-center justify-center p-10 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-slate-400 dark:text-slate-500 mb-6">
+              <svg class="w-12 h-12 mb-4 opacity-50" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path d="M20 7h-9M20 11h-9M20 15h-9M3 7h2v10H3V7zm0 0l2-2M3 17l2 2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
-              <p>暂无已选镜像</p>
+              <p class="text-sm">暂无已选镜像</p>
             </div>
-            <div v-else class="image-list">
-              <div v-for="image in selectedImages" :key="image" class="image-tag">
-                <span class="image-url">{{ image }}</span>
-                <button class="remove-btn" @click="removeImage(image)">
-                  <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path
-                      d="M6 18L18 6M6 6l12 12"
-                      stroke="currentColor"
-                      stroke-width="2"
-                      stroke-linecap="round"
-                      stroke-linejoin="round"
-                    />
+            
+            <div v-else class="flex flex-wrap gap-3 mb-6">
+              <div v-for="image in selectedImages" :key="image" class="flex items-center gap-2 px-3 py-2 bg-slate-100 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700 rounded-lg max-w-md group transition-colors">
+                <span class="font-mono text-xs text-slate-700 dark:text-slate-300 truncate">{{ image }}</span>
+                <button class="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-slate-200 dark:hover:bg-slate-600" @click="removeImage(image)">
+                  <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
                 </button>
               </div>
             </div>
-            <div v-if="formErrors.images" class="error-message">{{ formErrors.images }}</div>
-            <div class="add-buttons">
+
+            <div v-if="formErrors.images" class="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-500 text-red-600 dark:text-red-400 text-sm rounded-r">
+              {{ formErrors.images }}
+            </div>
+
+            <div class="flex gap-3">
               <el-button @click="showLibrarySelector = true">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
+                <el-icon class="mr-2"><Grid /></el-icon>
                 从镜像库选择
               </el-button>
               <el-button @click="showManualInput = true">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M12 4v16m8-8H4"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
+                 <el-icon class="mr-2"><Edit /></el-icon>
                 手动输入
               </el-button>
             </div>
@@ -386,255 +355,174 @@ const cancel = () => {
         </div>
 
         <!-- 任务参数 -->
-        <div class="form-section">
-          <div class="section-title">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M12 6V4m0 2a2 2 0 100 4 0 2 2 0 000-4zm0 16v-2m0 2a2 2 0 100 4 0 2 2 0 000-4zm8-8h-2m2 0a2 2 0 100 4 0 2 2 0 000-4zM6 12H4m2 0a2 2 0 100 4 0 2 2 0 000-4z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            任务参数
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-sm border border-slate-100 dark:border-slate-700/50">
+          <div class="flex items-center justify-between text-base font-semibold text-slate-900 dark:text-slate-100 mb-6 pb-3 border-b border-slate-200 dark:border-slate-700 gap-3">
+             <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-cyan-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 6V4m0 2a2 2 0 100 4 0 2 2 0 000-4zm0 16v-2m0 2a2 2 0 100 4 0 2 2 0 000-4zm8-8h-2m2 0a2 2 0 100 4 0 2 2 0 000-4zM6 12H4m2 0a2 2 0 100 4 0 2 2 0 000-4z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                任务参数
+             </div>
           </div>
-          <el-row :gutter="24">
-            <el-col :span="8">
-              <el-form-item label="批次大小" :error="!!formErrors.batchSize">
-                <el-input-number v-model="form.batchSize" :min="1" :max="100" style="width: 100%" @focus="markFieldTouched('batchSize')" />
-                <div v-if="formErrors.batchSize" class="error-hint">{{ formErrors.batchSize }}</div>
+          
+          <el-form label-width="100px" label-position="top">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <el-form-item label="批次大小" :error="formErrors.batchSize">
+                <el-input-number v-model="form.batchSize" :min="1" :max="100" class="!w-full" @focus="markFieldTouched('batchSize')" />
               </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="优先级" :error="!!formErrors.priority">
-                <el-input-number v-model="form.priority" :min="1" :max="10" style="width: 100%" @focus="markFieldTouched('priority')" />
-                <div v-if="formErrors.priority" class="error-hint">{{ formErrors.priority }}</div>
+              <el-form-item label="优先级" :error="formErrors.priority">
+                <el-input-number v-model="form.priority" :min="1" :max="10" class="!w-full" @focus="markFieldTouched('priority')" />
               </el-form-item>
-            </el-col>
-            <el-col :span="8">
-              <el-form-item label="最大重试" :error="!!formErrors.maxRetries">
-                <el-input-number v-model="form.maxRetries" :min="0" :max="5" style="width: 100%" @focus="markFieldTouched('maxRetries')" />
-                <div v-if="formErrors.maxRetries" class="error-hint">{{ formErrors.maxRetries }}</div>
+              <el-form-item label="最大重试" :error="formErrors.maxRetries">
+                <el-input-number v-model="form.maxRetries" :min="0" :max="5" class="!w-full" @focus="markFieldTouched('maxRetries')" />
               </el-form-item>
-            </el-col>
-          </el-row>
-          <el-row :gutter="24">
-            <el-col :span="12">
-              <el-form-item label="重试策略" :error="!!formErrors.retryStrategy">
-                <el-select v-model="form.retryStrategy" style="width: 100%" @focus="markFieldTouched('retryStrategy')">
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+               <el-form-item label="重试策略" :error="formErrors.retryStrategy">
+                <el-select v-model="form.retryStrategy" class="!w-full" @focus="markFieldTouched('retryStrategy')">
                   <el-option label="线性" value="linear" />
                   <el-option label="指数退避" value="exponential" />
                 </el-select>
-                <div v-if="formErrors.retryStrategy" class="error-hint">{{ formErrors.retryStrategy }}</div>
               </el-form-item>
-            </el-col>
-            <el-col :span="12">
-              <el-form-item label="重试延迟(秒)" :error="!!formErrors.retryDelay">
-                <el-input-number v-model="form.retryDelay" :min="5" :max="300" style="width: 100%" @focus="markFieldTouched('retryDelay')" />
-                <div v-if="formErrors.retryDelay" class="error-hint">{{ formErrors.retryDelay }}</div>
+              <el-form-item label="重试延迟(秒)" :error="formErrors.retryDelay">
+                <el-input-number v-model="form.retryDelay" :min="5" :max="300" class="!w-full" @focus="markFieldTouched('retryDelay')" />
               </el-form-item>
-            </el-col>
-          </el-row>
+            </div>
+          </el-form>
         </div>
 
         <!-- 私有仓库 -->
-        <div class="form-section">
-          <div class="section-title">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            私有仓库
-            <el-switch v-model="enableRegistry" />
-          </div>
+        <div class="bg-white dark:bg-slate-800 rounded-xl p-8 shadow-sm border border-slate-100 dark:border-slate-700/50">
+           <div class="flex items-center justify-between text-base font-semibold text-slate-900 dark:text-slate-100 mb-6 pb-3 border-b border-slate-200 dark:border-slate-700 gap-3">
+             <div class="flex items-center gap-3">
+                <svg class="w-5 h-5 text-cyan-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                私有仓库
+             </div>
+             <el-switch v-model="enableRegistry" />
+           </div>
 
-          <template v-if="enableRegistry">
-            <el-form-item label="认证方式">
-              <el-radio-group v-model="authMode">
-                <el-radio value="manual">手动输入</el-radio>
-                <el-radio value="select">选择已保存</el-radio>
-              </el-radio-group>
-            </el-form-item>
+           <transition name="el-zoom-in-top">
+            <div v-if="enableRegistry" class="space-y-6">
+              <el-form label-width="100px" label-position="top">
+                <el-form-item label="认证方式">
+                  <el-radio-group v-model="authMode">
+                    <el-radio value="manual">手动输入</el-radio>
+                    <el-radio value="select">选择已保存</el-radio>
+                  </el-radio-group>
+                </el-form-item>
 
-            <template v-if="authMode === 'manual'">
-              <el-form-item label="仓库地址" required :error="!!formErrors.registry">
-                <el-input v-model="form.registry" placeholder="harbor.example.com" @focus="markFieldTouched('registry')" />
-                <div v-if="formErrors.registry" class="error-hint">{{ formErrors.registry }}</div>
-              </el-form-item>
-              <el-form-item label="用户名" required :error="!!formErrors.username">
-                <el-input v-model="form.username" @focus="markFieldTouched('username')" />
-                <div v-if="formErrors.username" class="error-hint">{{ formErrors.username }}</div>
-              </el-form-item>
-              <el-form-item label="密码" required :error="!!formErrors.password">
-                <el-input v-model="form.password" type="password" show-password @focus="markFieldTouched('password')" />
-                <div v-if="formErrors.password" class="error-hint">{{ formErrors.password }}</div>
-              </el-form-item>
-            </template>
+                <div v-if="authMode === 'manual'" class="space-y-6">
+                  <el-form-item label="仓库地址" required :error="formErrors.registry">
+                    <el-input v-model="form.registry" placeholder="harbor.example.com" @focus="markFieldTouched('registry')" />
+                  </el-form-item>
+                  <el-form-item label="用户名" required :error="formErrors.username">
+                    <el-input v-model="form.username" @focus="markFieldTouched('username')" />
+                  </el-form-item>
+                  <el-form-item label="密码" required :error="formErrors.password">
+                    <el-input v-model="form.password" type="password" show-password @focus="markFieldTouched('password')" />
+                  </el-form-item>
+                </div>
 
-            <template v-if="authMode === 'select'">
-              <el-form-item label="选择认证" required :error="!!formErrors.secretId">
-                <el-select v-model="form.secretId" placeholder="请选择认证" style="width: 100%" @focus="markFieldTouched('secretId')">
-                  <el-option
-                    v-for="secret in secrets"
-                    :key="secret.id"
-                    :label="secret.name"
-                    :value="secret.id"
-                  >
-                    <span style="float: left">{{ secret.name }}</span>
-                    <span style="float: right; color: #8492a6; font-size: 12px">
-                      {{ secret.registry }}
-                    </span>
-                  </el-option>
-                </el-select>
-                <div v-if="formErrors.secretId" class="error-hint">{{ formErrors.secretId }}</div>
-              </el-form-item>
-            </template>
-          </template>
+                <div v-if="authMode === 'select'">
+                  <el-form-item label="选择认证" required :error="formErrors.secretId">
+                    <el-select v-model="form.secretId" placeholder="请选择认证" class="!w-full" @focus="markFieldTouched('secretId')">
+                      <el-option
+                        v-for="secret in secrets"
+                        :key="secret.id"
+                        :label="secret.name"
+                        :value="secret.id"
+                      >
+                        <div class="flex justify-between items-center w-full">
+                           <span>{{ secret.name }}</span>
+                           <span class="text-xs text-slate-400">{{ secret.registry }}</span>
+                        </div>
+                      </el-option>
+                    </el-select>
+                  </el-form-item>
+                </div>
+              </el-form>
+            </div>
+           </transition>
         </div>
-      </el-form>
       </div>
 
       <!-- Right: Reference Panel -->
-      <div class="reference-panel">
-        <div class="panel-tabs">
-          <button
-            class="tab-button"
-            :class="{ active: activeTab === 'stats' }"
-            @click="activeTab = 'stats'"
-          >
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M3 13h8V3H3v10zm0 0l3-3M3 16l3 3"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            运行统计
-          </button>
-          <button
-            class="tab-button"
-            :class="{ active: activeTab === 'images' }"
-            @click="activeTab = 'images'"
-          >
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M4.318 6.318a4.5 4.5 0 000-9 0 4.5 4.5 0 009 0zM21.5 9a4.5 4.5 0 00-9 0 4.5 4.5 0 009 0zM4.5 9.5a4.5 4.5 0 013 0 4.5 4.5 0 000-9 0zM21.5 12.5a4.5 4.5 0 01-1.38 8.62 4.5 4.5 0 01-8.62 1.38zM4.5 19.5a4.5 4.5 0 01-2.62 3.38 4.5 4.5 0 01-3.38-2.62zM21.5 16.5a4.5 4.5 0 000-9 0 4.5 4.5 0 000 9 0z"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            常用镜像
-          </button>
+      <div class="hidden xl:block w-96 bg-white dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700/50 overflow-hidden sticky top-6 self-start shadow-sm">
+        <div class="flex border-b border-slate-200 dark:border-slate-700">
+           <button class="flex-1 py-4 text-sm font-medium transition-colors border-b-2"
+                   :class="activeTab === 'stats' ? 'text-cyan-600 border-cyan-500 bg-cyan-50/50 dark:bg-cyan-900/10' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-200'"
+                   @click="activeTab = 'stats'">
+             运行统计
+           </button>
+           <button class="flex-1 py-4 text-sm font-medium transition-colors border-b-2"
+                   :class="activeTab === 'images' ? 'text-cyan-600 border-cyan-500 bg-cyan-50/50 dark:bg-cyan-900/10' : 'text-slate-500 dark:text-slate-400 border-transparent hover:text-slate-700 dark:hover:text-slate-200'"
+                   @click="activeTab = 'images'">
+             常用镜像
+           </button>
         </div>
 
-        <!-- Stats Tab Content -->
-        <div v-if="activeTab === 'stats'" class="panel-content">
-          <!-- Running Tasks -->
-          <div class="stat-card primary">
-            <div class="stat-header">
-              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0 9 9 0 01-8-2 9-9 0 00-2 9 9 0 002-8-2v-2a2 2 0 00-2 2 0 000-4zm0 0l3-3M3 16l3 3"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-              <span>运行中任务</span>
-            </div>
-            <div class="stat-value">{{ runningTasks.length }}</div>
-            <div v-if="runningTasks.length === 0" class="stat-trend neutral">暂无运行中任务</div>
-            <div v-else class="stat-trend">
-              <router-link to="/tasks">查看全部</router-link>
-            </div>
-          </div>
-
-          <!-- Recent Failed Tasks -->
-          <div v-if="recentFailedTasks.length > 0" class="failed-tasks-section">
-            <div class="section-title-small">最近失败任务</div>
-            <div class="failed-list">
-              <div
-                v-for="task in recentFailedTasks"
-                :key="task.taskId"
-                class="failed-item"
-                @click="router.push(`/tasks/${task.taskId}`)"
-              >
-                <div class="failed-task-id">{{ task.taskId }}</div>
-                <div class="failed-task-error">{{ task.errorMessage || '任务执行失败' }}</div>
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M9 5l7 7-7-7"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
+        <div class="p-6 h-[calc(100vh-250px)] overflow-y-auto custom-scrollbar">
+           <!-- Stats Tab -->
+           <div v-if="activeTab === 'stats'" class="space-y-8">
+              <div class="bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl p-5 text-white shadow-lg shadow-cyan-500/20">
+                 <div class="flex items-center gap-2 mb-2 opacity-90">
+                    <el-icon><VideoPlay /></el-icon>
+                    <span class="text-sm font-medium">运行中任务</span>
+                 </div>
+                 <div class="text-3xl font-bold">{{ runningTasks.length }}</div>
+                 <div class="mt-4 text-xs opacity-80 flex justify-between items-center">
+                    <span>实时监控</span>
+                    <button class="hover:underline" @click="router.push('/tasks')">查看全部 ></button>
+                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- Tips -->
-          <div class="tips-section">
-            <div class="section-title-small">提示</div>
-            <ul class="tips-list">
-              <li>批次大小建议设置为10-20,避免单批次节点过多</li>
-              <li>优先级越高,任务执行越早</li>
-              <li>私有仓库认证信息已保存在"仓库认证"页面</li>
-            </ul>
-          </div>
-        </div>
-
-        <!-- Images Tab Content -->
-        <div v-if="activeTab === 'images'" class="panel-content">
-          <div class="section-title-small">常用镜像推荐</div>
-          <div class="popular-images-list">
-            <div
-              v-for="image in popularImages"
-              :key="image"
-              class="popular-image-item"
-              :class="{ selected: selectedImages.includes(image) }"
-              @click="addPopularImage(image)"
-            >
-              <div class="popular-image-name">{{ getShortImageName(image) }}</div>
-              <div class="popular-image-url">{{ image }}</div>
-              <div v-if="selectedImages.includes(image)" class="check-icon">
-                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    d="M5 13l4 4L19 7"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                  />
-                </svg>
+              <div v-if="recentFailedTasks.length > 0">
+                 <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">最近失败任务</h4>
+                 <div class="space-y-2">
+                    <div v-for="task in recentFailedTasks" :key="task.taskId" 
+                         class="p-3 bg-red-50 dark:bg-red-900/20 border-l-2 border-red-500 rounded-r-lg cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors group"
+                         @click="router.push(`/tasks/${task.taskId}`)">
+                       <div class="flex justify-between items-start">
+                          <span class="font-mono text-xs text-slate-700 dark:text-slate-300 group-hover:text-red-700 dark:group-hover:text-red-200">{{ task.taskId }}</span>
+                          <el-icon class="text-red-400"><ArrowRight /></el-icon>
+                       </div>
+                       <div class="text-xs text-red-500 mt-1 truncate">{{ task.errorMessage || 'Unknown Error' }}</div>
+                    </div>
+                 </div>
               </div>
-            </div>
-          </div>
 
-          <div v-if="popularImages.length === 0" class="empty-hint">
-            暂无常用镜像数据
-          </div>
+               <div>
+                 <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">提示</h4>
+                 <ul class="space-y-2 text-sm text-slate-600 dark:text-slate-400 list-disc pl-4 marker:text-cyan-500">
+                    <li>批次大小建议10-20</li>
+                    <li>优先级越高执行越早</li>
+                    <li>私有仓库需配置认证</li>
+                 </ul>
+              </div>
+           </div>
 
-          <div class="tips-section">
-            <div class="section-title-small">镜像使用建议</div>
-            <ul class="tips-list">
-              <li>推荐使用:latest或指定tag版本</li>
-              <li>建议将常用镜像保存到镜像库</li>
-              <li>私有仓库镜像需要配置认证信息</li>
-            </ul>
-          </div>
+           <!-- Images Tab -->
+           <div v-if="activeTab === 'images'" class="space-y-6">
+              <div>
+                 <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">推荐镜像</h4>
+                 <div v-if="popularImages.length > 0" class="space-y-2">
+                    <div v-for="image in popularImages" :key="image"
+                         class="p-3 rounded-lg border border-slate-100 dark:border-slate-700 hover:border-cyan-500 dark:hover:border-cyan-500 cursor-pointer transition-all group relative bg-slate-50 dark:bg-slate-900"
+                         :class="{'ring-2 ring-cyan-500 ring-offset-2 dark:ring-offset-slate-800': selectedImages.includes(image)}"
+                         @click="addPopularImage(image)">
+                       <div class="font-medium text-slate-700 dark:text-slate-200 text-sm mb-1">{{ getShortImageName(image) }}</div>
+                       <div class="text-xs text-slate-500 font-mono truncate">{{ image }}</div>
+                       <div v-if="selectedImages.includes(image)" class="absolute top-2 right-2 text-cyan-500">
+                          <el-icon><Check /></el-icon>
+                       </div>
+                    </div>
+                 </div>
+                 <div v-else class="text-center py-8 text-slate-400 text-sm">暂无推荐数据</div>
+              </div>
+           </div>
         </div>
       </div>
     </div>
@@ -644,85 +532,60 @@ const cancel = () => {
       v-model="showLibrarySelector"
       title="从镜像库选择"
       width="900px"
+      class="rounded-xl overflow-hidden"
       @open="loadLibraryImages"
+      append-to-body
     >
-      <div class="library-header">
+      <div class="flex gap-4 mb-4">
         <el-input
           v-model="searchText"
           placeholder="搜索镜像..."
           :prefix-icon="'Search'"
-          class="search-input"
           clearable
+          class="flex-1"
         />
-        <div class="sort-controls">
-          <el-select v-model="sortField" size="small" class="sort-select">
-            <el-option label="按名称" value="name" />
-            <el-option label="按添加时间" value="createdAt" />
-          </el-select>
-          <el-button
-            size="small"
-            @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'"
-          >
-            <svg v-if="sortOrder === 'asc'" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M18 15l-6-6 6-6M6 6l6 6 6-6"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-            <svg v-else viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M6 9l6-6 6 6M6 15l6-6 6-6"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </el-button>
-        </div>
-      </div>
-      <div v-if="libraryLoading" class="loading-text">加载中...</div>
-      <div v-else class="library-grid">
-        <div
-          v-for="img in filteredLibraryImages"
-          :key="img.id"
-          class="library-item"
-          :class="{ selected: selectedImages.includes(img.image) }"
-          @click="addImage(img.image)"
-        >
-          <div class="library-item-name">{{ img.name }}</div>
-          <div class="library-item-image">{{ img.image }}</div>
-          <div v-if="selectedImages.includes(img.image)" class="check-icon">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path
-                d="M5 13l4 4L19 7"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </div>
-        </div>
-      </div>
-      <template #footer>
-        <el-button @click="showLibrarySelector = false; clearSearch()">关闭</el-button>
-        <el-button type="primary" @click="showLibrarySelector = false">
-          已选择 {{ selectedImages.length }} 个镜像
+        <el-button-group>
+           <el-button :type="sortField === 'name' ? 'primary' : ''" @click="sortField = 'name'">名称</el-button>
+           <el-button :type="sortField === 'createdAt' ? 'primary' : ''" @click="sortField = 'createdAt'">时间</el-button>
+        </el-button-group>
+        <el-button @click="sortOrder = sortOrder === 'asc' ? 'desc' : 'asc'">
+           {{ sortOrder === 'asc' ? '升序' : '降序' }}
         </el-button>
+      </div>
+      
+      <div v-if="libraryLoading" class="py-12 text-center text-slate-400">加载中...</div>
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto p-1 custom-scrollbar">
+         <div v-for="img in filteredLibraryImages" :key="img.id"
+              class="p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:border-cyan-500 transition-all relative"
+              :class="selectedImages.includes(img.image) ? 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-500' : 'bg-white dark:bg-slate-800'"
+              @click="addImage(img.image)">
+             <div class="font-medium text-slate-700 dark:text-slate-200 text-sm truncate">{{ img.name }}</div>
+             <div class="text-xs text-slate-500 font-mono truncate mt-1">{{ img.image }}</div>
+             <div v-if="selectedImages.includes(img.image)" class="absolute top-2 right-2 text-cyan-600">
+                 <el-icon><Check /></el-icon>
+             </div>
+         </div>
+      </div>
+      
+      <template #footer>
+         <div class="flex justify-between items-center">
+            <span class="text-slate-500 text-sm">已选择 {{ selectedImages.length }} 个镜像</span>
+            <div class="flex gap-2">
+               <el-button @click="showLibrarySelector = false">关闭</el-button>
+               <el-button type="primary" @click="showLibrarySelector = false">确认</el-button>
+            </div>
+         </div>
       </template>
     </el-dialog>
 
     <!-- Manual Input Dialog -->
-    <el-dialog v-model="showManualInput" title="手动输入镜像" width="600px">
+    <el-dialog v-model="showManualInput" title="手动输入镜像" width="600px" append-to-body class="rounded-xl">
       <el-input
         v-model="manualImageInput"
         type="textarea"
         :rows="8"
         placeholder="每行输入一个镜像地址，例如：&#10;docker.io/library/nginx:latest&#10;registry.cn-hangzhou.aliyuncs.com/library/redis:7"
+        class="font-mono text-sm"
       />
       <template #footer>
         <el-button @click="showManualInput = false">取消</el-button>
@@ -733,347 +596,18 @@ const cancel = () => {
 </template>
 
 <style scoped>
-.task-create {
-  max-width: 1600px;
-  margin: 0 auto;
+/* Custom Scrollbar for inner panels */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
-
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 32px;
-}
-
-.page-header h1 {
-  font-size: 28px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.content-wrapper {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
-}
-
-.form-section {
-  background: white;
-  border-radius: 12px;
-  padding: 32px;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  flex: 1;
-}
-
-.form-section {
-  margin-bottom: 32px;
-}
-
-.form-section:last-child {
-  margin-bottom: 0;
-}
-
-.section-title {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 16px;
-  font-weight: 600;
-  color: #0f172a;
-  margin-bottom: 24px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid #e2e8f0;
-  gap: 12px;
-}
-
-.section-title svg {
-  width: 20px;
-  height: 20px;
-  color: #0891b2;
-}
-
-.selected-images {
-  min-height: 120px;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px;
-  border: 2px dashed #e2e8f0;
-  border-radius: 8px;
-  color: #94a3b8;
-}
-
-.empty-state svg {
-  width: 48px;
-  height: 48px;
-  margin-bottom: 16px;
-}
-
-.empty-state p {
-  margin: 0;
-  font-size: 14px;
-}
-
-.image-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.image-tag {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #0f172a;
-  max-width: 400px;
-}
-
-.image-url {
-  font-family: monospace;
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.remove-btn {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
+.custom-scrollbar::-webkit-scrollbar-track {
   background: transparent;
-  cursor: pointer;
-  border-radius: 4px;
-  color: #94a3b8;
-  transition: all 0.2s;
-  flex-shrink: 0;
 }
-
-.remove-btn:hover {
-  background: #ef4444;
-  color: white;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1;
+  border-radius: 3px;
 }
-
-.remove-btn svg {
-  width: 14px;
-  height: 14px;
-}
-
-.add-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-.error-message {
-  color: #ef4444;
-  font-size: 13px;
-  margin-top: 12px;
-  padding: 12px;
-  background: #fef2f2;
-  border-radius: 6px;
-  border-left: 3px solid #ef4444;
-}
-
-.error-hint {
-  color: #ef4444;
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-/* Responsive */
-@media (max-width: 1440px) {
-  .task-create {
-    max-width: 100%;
-  }
-
-  .content-wrapper {
-    flex-direction: column;
-  }
-
-  .reference-panel {
-    width: 100%;
-    border-top: 1px solid #e2e8f0;
-    padding-top: 24px;
-  }
-
-  .form-section {
-    border-radius: 12px 12px 0 0;
-  }
-}
-
-@media (max-width: 1024px) {
-  .reference-panel {
-    display: none;
-  }
-}
-
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .page-header h1 {
-    color: #f8fafc;
-  }
-
-  .form-section {
-    background: #1e293b;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-  }
-
-  .section-title {
-    color: #f8fafc;
-    border-bottom-color: #334155;
-  }
-
-  .empty-state {
-    border-color: #334155;
-    color: #64748b;
-  }
-
-  .image-tag {
-    background: #334155;
-    border-color: #475569;
-    color: #f8fafc;
-  }
-
-  .library-item {
-    background: #0f172a;
-    border-color: #334155;
-  }
-
-  .library-item:hover {
-    background: #1e293b;
-    border-color: #22d3ee;
-  }
-
-  .library-item.selected {
-    background: rgba(34, 197, 94, 0.2);
-    border-color: #22c55e;
-  }
-
-  .library-item-name {
-    color: #f8fafc;
-  }
-
-  .library-item-image {
-    color: #94a3b8;
-  }
-
-  .loading-text {
-    color: #94a3b8;
-  }
-
-  /* Reference Panel Dark Mode */
-  .reference-panel {
-    background: #1e293b;
-    border-color: #334155;
-  }
-
-  .panel-tabs {
-    border-bottom-color: #334155;
-  }
-
-  .tab-button {
-    color: #94a3b8;
-  }
-
-  .tab-button:hover {
-    background: #334155;
-    color: #f8fafc;
-  }
-
-  .tab-button.active {
-    background: rgba(34, 211, 238, 0.15);
-    color: #22d3ee;
-  }
-
-  .section-title-small {
-    color: #cbd5e1;
-  }
-
-  .failed-item {
-    background: rgba(239, 68, 68, 0.15);
-    border-left-color: #f87171;
-  }
-
-  .failed-task-id {
-    color: #f8fafc;
-  }
-
-  .failed-task-error {
-    color: #94a3b8;
-  }
-
-  .tips-section {
-    border-top-color: #334155;
-  }
-
-  .tips-list li {
-    color: #94a3b8;
-  }
-
-  .tips-list li::before {
-    color: #22d3ee;
-  }
-
-  .popular-image-item {
-    background: #0f172a;
-    border-color: #334155;
-  }
-
-  .popular-image-item:hover {
-    background: #1e293b;
-    border-color: #22d3ee;
-  }
-
-  .popular-image-item.selected {
-    background: rgba(34, 197, 94, 0.2);
-    border-color: #22c55e;
-  }
-
-  .popular-image-name {
-    color: #f8fafc;
-  }
-
-  .popular-image-url {
-    color: #94a3b8;
-  }
-
-  .empty-hint {
-    color: #64748b;
-  }
-
-  /* Responsive */
-  @media (max-width: 1440px) {
-    .form-section {
-      border-radius: 12px 12px 0 0;
-    }
-
-    .reference-panel {
-      border-top-color: #334155;
-    }
-  }
-
-  @media (max-width: 1024px) {
-    .reference-panel {
-      display: none;
-    }
-  }
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: #475569;
 }
 </style>
