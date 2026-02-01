@@ -25,6 +25,10 @@ const router = createRouter({
           path: '',
           component: () => import('@/views/TasksView.vue'),
         },
+        {
+          path: 'create',
+          component: () => import('@/views/TasksCreateView.vue'),
+        },
       ],
     },
     {
@@ -34,6 +38,10 @@ const router = createRouter({
         {
           path: '',
           component: () => import('@/views/ScheduledTasksView.vue'),
+        },
+        {
+          path: 'history',
+          component: () => import('@/views/ScheduledHistoryView.vue'),
         },
       ],
     },
@@ -45,6 +53,10 @@ const router = createRouter({
           path: '',
           component: () => import('@/views/LibraryView.vue'),
         },
+        {
+          path: 'import',
+          component: () => import('@/views/LibraryImportView.vue'),
+        },
       ],
     },
     {
@@ -55,6 +67,10 @@ const router = createRouter({
           path: '',
           component: () => import('@/views/SecretsView.vue'),
         },
+        {
+          path: 'create',
+          component: () => import('@/views/SecretsCreateView.vue'),
+        },
       ],
     },
     {
@@ -64,6 +80,18 @@ const router = createRouter({
         {
           path: '',
           component: () => import('@/views/AdminView.vue'),
+        },
+        {
+          path: 'users',
+          component: () => import('@/views/AdminUsersView.vue'),
+        },
+        {
+          path: 'settings',
+          component: () => import('@/views/AdminSettingsView.vue'),
+        },
+        {
+          path: 'logs',
+          component: () => import('@/views/AdminLogsView.vue'),
         },
       ],
     },

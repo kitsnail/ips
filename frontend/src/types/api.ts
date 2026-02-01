@@ -32,6 +32,10 @@ export interface CreateUserRequest {
   role: UserRole
 }
 
+export interface UpdateUserRequest {
+  role: UserRole
+}
+
 export interface UpdatePasswordRequest {
   newPassword: string
 }
@@ -273,4 +277,15 @@ export interface FilterState {
   status?: string
   search: string
   enabled?: string
+}
+
+// Log Types
+export type LogLevel = 'info' | 'warning' | 'error' | 'success'
+
+export interface LogEntry {
+  id: number
+  timestamp: string
+  level: LogLevel
+  message: string
+  details?: string
 }

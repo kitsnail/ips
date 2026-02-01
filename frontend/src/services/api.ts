@@ -4,6 +4,7 @@ import type {
   LoginRequest,
   LoginResponse,
   CreateUserRequest,
+  UpdateUserRequest,
   UpdatePasswordRequest,
   Task,
   CreateTaskRequest,
@@ -202,6 +203,11 @@ export const userApi = {
 
   create: async (data: CreateUserRequest): Promise<User> => {
     const response = await apiClient.post<User>('/users', data)
+    return response.data
+  },
+
+  update: async (id: number, data: UpdateUserRequest): Promise<User> => {
+    const response = await apiClient.put<User>(`/users/${id}`, data)
     return response.data
   },
 
