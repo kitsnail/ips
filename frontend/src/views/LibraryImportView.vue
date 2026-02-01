@@ -28,7 +28,7 @@ const validateImageLine = (line: string): { valid: boolean; displayName: string;
   }
 
   // Check if it's a valid image URL format
-  const imageRegex = /^[\w.-]+(:\S+)?$/
+  const imageRegex = /^[\w.\-\/:@]+$/
   if (!imageRegex.test(trimmed)) {
     return { valid: false, displayName: '', imageUrl: trimmed }
   }
