@@ -6,11 +6,18 @@ import type { ScheduledTask, CreateScheduledTaskRequest } from '@/types/api'
 
 const loading = ref(false)
 const scheduledTasks = ref<ScheduledTask[]>([])
+
+// Pagination state
+const pagination = ref({
+  page: 1,
+  pageSize: 10,
+  total: 0
+})
 const showCreateModal = ref(false)
 const showEditModal = ref(false)
 const selectedTasks = ref<ScheduledTask[]>([])
 const editingTask = ref<ScheduledTask | null>(null)
-let refreshInterval: number | null = null
+
 
 // Use separate field for textarea input
 const imagesInput = ref('')
@@ -36,8 +43,13 @@ const form = ref<CreateScheduledTaskRequest>({
 const loadScheduledTasks = async () => {
   try {
     loading.value = true
-    const response = await scheduledTaskApi.list({ limit: 50, offset: 0 })
+    const offset = (pagination.value.page - 1) * pagination.value.pageSize
+    const response = await scheduledTaskApi.list({ 
+      limit: pagination.value.pageSize, 
+      offset: offset 
+    })
     scheduledTasks.value = response.tasks
+    pagination.value.total = response.total || response.tasks.length
   } catch (error) {
     ElMessage.error('加载定时任务失败')
   } finally {
@@ -110,7 +122,8 @@ const handleDelete = async (task: ScheduledTask) => {
     loadScheduledTasks()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
+      console.error('Delete scheduled task error:', error)
+      ElMessage.error(`删除失败: ${error instanceof Error ? error.message : '未知错误'}`)
     }
   }
 }
@@ -191,10 +204,22 @@ const handleBulkDelete = async () => {
     loadScheduledTasks();
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('批量删除失败');
+      console.error('Bulk delete scheduled tasks error:', error)
+      ElMessage.error(`批量删除失败: ${error instanceof Error ? error.message : '未知错误'}`)
     }
   }
 };
+
+const handlePageChange = (page: number) => {
+  pagination.value.page = page
+  loadScheduledTasks()
+}
+
+const handlePageSizeChange = (pageSize: number) => {
+  pagination.value.pageSize = pageSize
+  pagination.value.page = 1  // Reset to first page when changing page size
+  loadScheduledTasks()
+}
 
 const resetForm = () => {
   form.value = {
@@ -220,15 +245,10 @@ const resetForm = () => {
 
 onMounted(() => {
   loadScheduledTasks()
-  refreshInterval = window.setInterval(() => {
-    loadScheduledTasks()
-  }, 5000)
 })
 
 onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
+  // 清理工作（如果有的话）
 })
 </script>
 
@@ -290,9 +310,23 @@ onUnmounted(() => {
            </el-button>
          </template>
        </el-table-column>
-     </el-table>
+      </el-table>
 
-     <!-- Create Dialog -->
+      <!-- Pagination -->
+      <div style="display: flex; justify-content: center; margin-top: 20px;">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="pagination.total"
+          layout="sizes, prev, pager, next, total"
+          :background="true"
+          @size-change="handlePageSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
+
+      <!-- Create Dialog -->
      <el-dialog
        :model-value="showCreateModal"
        @update:model-value="(val: boolean) => showCreateModal = val"

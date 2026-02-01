@@ -87,7 +87,15 @@ export const taskApi = {
   },
 
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/tasks/${id}`)
+    try {
+      const response = await apiClient.delete(`/tasks/${id}`)
+      // API返回 { "taskId": "...", "status": "success", "action": "...", "message": "..." }
+      // 我们只需要确保请求成功，不需要返回数据
+      console.log('Task delete response:', response.data)
+    } catch (error) {
+      console.error('Task delete error:', error)
+      throw error
+    }
   },
 }
 
@@ -113,7 +121,13 @@ export const scheduledTaskApi = {
   },
 
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/scheduled-tasks/${id}`)
+    try {
+      const response = await apiClient.delete(`/scheduled-tasks/${id}`)
+      console.log('Scheduled task delete response:', response.data)
+    } catch (error) {
+      console.error('Scheduled task delete error:', error)
+      throw error
+    }
   },
 
   enable: async (id: string): Promise<void> => {

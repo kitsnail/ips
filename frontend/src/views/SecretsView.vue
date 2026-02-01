@@ -6,9 +6,16 @@ import type { Secret, CreateSecretRequest } from '@/types/api'
 
 const loading = ref(false)
 const secrets = ref<Secret[]>([])
+
+// Pagination state
+const pagination = ref({
+  page: 1,
+  pageSize: 10,
+  total: 0
+})
 const showAddModal = ref(false)
 const selectedSecrets = ref<number[]>([])
-let refreshInterval: number | null = null
+
 
 const form = ref<CreateSecretRequest>({
   name: '',
@@ -20,8 +27,13 @@ const form = ref<CreateSecretRequest>({
 const loadSecrets = async () => {
   try {
     loading.value = true
-    const response = await secretApi.list({ pageSize: 100 })
+    // Use page and page size parameters for consistency with other views 
+    const response = await secretApi.list({ 
+      page: pagination.value.page, 
+      pageSize: pagination.value.pageSize 
+    })
     secrets.value = response.secrets
+    pagination.value.total = response.total || response.secrets.length
   } catch (error) {
     ElMessage.error('加载认证信息失败')
   } finally {
@@ -80,6 +92,17 @@ const handleBatchDelete = async () => {
   }
 }
 
+const handlePageChange = (page: number) => {
+  pagination.value.page = page
+  loadSecrets()
+}
+
+const handlePageSizeChange = (pageSize: number) => {
+  pagination.value.pageSize = pageSize
+  pagination.value.page = 1  // Reset to first page when changing page size
+  loadSecrets()
+}
+
 const handleSelectAll = (checked: boolean) => {
   if (checked) {
     selectedSecrets.value = secrets.value.map((s) => s.id)
@@ -90,15 +113,10 @@ const handleSelectAll = (checked: boolean) => {
 
 onMounted(() => {
   loadSecrets()
-  refreshInterval = window.setInterval(() => {
-    loadSecrets()
-  }, 5000)
 })
 
 onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
+  // 清理工作（如果有的话）
 })
 </script>
 
@@ -144,9 +162,23 @@ onUnmounted(() => {
           </el-button>
         </template>
       </el-table-column>
-    </el-table>
+      </el-table>
 
-    <el-dialog v-model="showAddModal" title="添加仓库认证" width="500px">
+      <!-- Pagination -->
+      <div style="display: flex; justify-content: center; margin-top: 20px;">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="pagination.total"
+          layout="sizes, prev, pager, next, total"
+          :background="true"
+          @size-change="handlePageSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
+
+     <el-dialog v-model="showAddModal" title="添加仓库认证" width="500px">
       <el-form label-width="120px">
         <el-form-item label="认证名称" required>
           <el-input v-model="form.name" placeholder="例如：Harbor私有仓库" />

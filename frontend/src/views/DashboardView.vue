@@ -12,7 +12,7 @@ const scheduledTasks = ref(0)
 const scheduledActive = ref(0)
 const recentTasks = ref<Task[]>([])
 
-let refreshInterval: number | null = null
+
 
 const refreshDashboardStats = async () => {
   try {
@@ -49,15 +49,10 @@ const refreshDashboardStats = async () => {
 
 onMounted(() => {
   refreshDashboardStats()
-  refreshInterval = window.setInterval(() => {
-    refreshDashboardStats()
-  }, 5000)
 })
 
 onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
+  // 清理工作（如果有的话）
 })
 </script>
 

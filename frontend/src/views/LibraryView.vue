@@ -6,9 +6,16 @@ import type { LibraryImage, SaveImageRequest } from '@/types/api'
 
 const loading = ref(false)
 const libraryImages = ref<LibraryImage[]>([])
+
+// Pagination state
+const pagination = ref({
+  page: 1,
+  pageSize: 10,
+  total: 0
+})
 const showAddModal = ref(false)
 const selectedImages = ref<number[]>([])
-let refreshInterval: number | null = null
+
 
 const form = ref<SaveImageRequest>({
   name: '',
@@ -18,8 +25,13 @@ const form = ref<SaveImageRequest>({
 const loadLibraryImages = async () => {
   try {
     loading.value = true
-    const response = await libraryApi.list({ limit: 100, offset: 0 })
+    const offset = (pagination.value.page - 1) * pagination.value.pageSize
+    const response = await libraryApi.list({ 
+      limit: pagination.value.pageSize, 
+      offset: offset 
+    })
     libraryImages.value = response.images
+    pagination.value.total = response.total || response.images.length
   } catch (error) {
     ElMessage.error('加载镜像库失败')
   } finally {
@@ -78,6 +90,17 @@ const handleBatchDelete = async () => {
   }
 }
 
+const handlePageChange = (page: number) => {
+  pagination.value.page = page
+  loadLibraryImages()
+}
+
+const handlePageSizeChange = (pageSize: number) => {
+  pagination.value.pageSize = pageSize
+  pagination.value.page = 1  // Reset to first page when changing page size
+  loadLibraryImages()
+}
+
 const handleSelectAll = (checked: boolean) => {
   if (checked) {
     selectedImages.value = libraryImages.value.map((img) => img.id)
@@ -88,15 +111,10 @@ const handleSelectAll = (checked: boolean) => {
 
 onMounted(() => {
   loadLibraryImages()
-  refreshInterval = window.setInterval(() => {
-    loadLibraryImages()
-  }, 5000)
 })
 
 onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
+  // 清理工作（如果有的话）
 })
 </script>
 
@@ -141,9 +159,23 @@ onUnmounted(() => {
           </el-button>
         </template>
       </el-table-column>
-    </el-table>
+      </el-table>
 
-    <el-dialog v-model="showAddModal" title="添加镜像" width="500px">
+      <!-- Pagination -->
+      <div style="display: flex; justify-content: center; margin-top: 20px;">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="pagination.total"
+          layout="sizes, prev, pager, next, total"
+          :background="true"
+          @size-change="handlePageSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
+
+     <el-dialog v-model="showAddModal" title="添加镜像" width="500px">
       <el-form label-width="100px">
         <el-form-item label="显示名称" required>
           <el-input v-model="form.name" placeholder="例如：Nginx" />

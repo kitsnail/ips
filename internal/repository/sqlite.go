@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/kitsnail/ips/pkg/models"
@@ -13,7 +14,8 @@ import (
 )
 
 type SQLiteRepository struct {
-	db *sql.DB
+	db          *sql.DB
+	deleteMutex sync.Mutex
 }
 
 func NewSQLiteRepository(dsn string) (*SQLiteRepository, error) {
@@ -206,21 +208,17 @@ func (r *SQLiteRepository) execWithRetry(ctx context.Context, execFunc func() (s
 	var result sql.Result
 	var err error
 
-	// Try up to 5 times with exponential backoff
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		result, err = execFunc()
 
-		// If no error or context is cancelled, return immediately
 		if err == nil {
 			return result, nil
 		}
 
-		// Check if this is a busy error that we should retry
 		if strings.Contains(err.Error(), "database is locked") ||
 			strings.Contains(err.Error(), "SQLITE_BUSY") ||
 			strings.Contains(err.Error(), "database locked") {
 
-			// Wait before retrying (exponential backoff: 10ms, 20ms, 40ms, 80ms, 160ms)
 			waitTime := time.Millisecond * time.Duration(10*(1<<uint(i)))
 			select {
 			case <-time.After(waitTime):
@@ -230,7 +228,6 @@ func (r *SQLiteRepository) execWithRetry(ctx context.Context, execFunc func() (s
 			}
 		}
 
-		// If it's not a busy error, return immediately
 		return nil, err
 	}
 
@@ -269,7 +266,7 @@ func (r *SQLiteRepository) GetTask(ctx context.Context, id string) (*models.Task
 		&task.CreatedAt, &task.StartedAt, &task.FinishedAt)
 
 	if err == sql.ErrNoRows {
-		return nil, fmt.Errorf("task not found")
+		return nil, ErrTaskNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -325,7 +322,12 @@ func (r *SQLiteRepository) ListTasks(ctx context.Context, offset, limit int) ([]
 }
 
 func (r *SQLiteRepository) DeleteTask(ctx context.Context, id string) error {
-	_, err := r.db.ExecContext(ctx, "DELETE FROM tasks WHERE id = ?", id)
+	r.deleteMutex.Lock()
+	defer r.deleteMutex.Unlock()
+
+	_, err := r.execWithRetry(ctx, func() (sql.Result, error) {
+		return r.db.ExecContext(ctx, "DELETE FROM tasks WHERE id = ?", id)
+	})
 	return err
 }
 
@@ -392,6 +394,9 @@ func (r *SQLiteRepository) UpdateUser(ctx context.Context, user *models.User) er
 }
 
 func (r *SQLiteRepository) DeleteUser(ctx context.Context, id int64) error {
+	r.deleteMutex.Lock()
+	defer r.deleteMutex.Unlock()
+
 	_, err := r.db.ExecContext(ctx, "DELETE FROM users WHERE id = ?", id)
 	return err
 }
@@ -437,6 +442,9 @@ func (r *SQLiteRepository) ListTokens(ctx context.Context, userID int64) ([]*mod
 }
 
 func (r *SQLiteRepository) DeleteToken(ctx context.Context, id int64) error {
+	r.deleteMutex.Lock()
+	defer r.deleteMutex.Unlock()
+
 	_, err := r.db.ExecContext(ctx, "DELETE FROM api_tokens WHERE id = ?", id)
 	return err
 }
@@ -484,6 +492,9 @@ func (r *SQLiteRepository) ListImages(ctx context.Context, offset, limit int) ([
 }
 
 func (r *SQLiteRepository) DeleteImage(ctx context.Context, id int64) error {
+	r.deleteMutex.Lock()
+	defer r.deleteMutex.Unlock()
+
 	_, err := r.db.ExecContext(ctx, "DELETE FROM image_library WHERE id = ?", id)
 	return err
 }
@@ -579,6 +590,9 @@ func (r *SQLiteRepository) UpdateSecret(ctx context.Context, secret *models.Regi
 }
 
 func (r *SQLiteRepository) DeleteSecret(ctx context.Context, id int64) error {
+	r.deleteMutex.Lock()
+	defer r.deleteMutex.Unlock()
+
 	_, err := r.db.ExecContext(ctx, "DELETE FROM registry_secrets WHERE id = ?", id)
 	return err
 }
@@ -699,6 +713,9 @@ func (r *SQLiteRepository) UpdateScheduledTask(ctx context.Context, task *models
 }
 
 func (r *SQLiteRepository) DeleteScheduledTask(ctx context.Context, id string) error {
+	r.deleteMutex.Lock()
+	defer r.deleteMutex.Unlock()
+
 	_, err := r.db.ExecContext(ctx, "DELETE FROM scheduled_tasks WHERE id = ?", id)
 	return err
 }
@@ -826,6 +843,9 @@ func (r *SQLiteRepository) UpdateExecution(ctx context.Context, execution *model
 }
 
 func (r *SQLiteRepository) DeleteOldExecutions(ctx context.Context, before time.Time) (int64, error) {
+	r.deleteMutex.Lock()
+	defer r.deleteMutex.Unlock()
+
 	result, err := r.db.ExecContext(ctx, "DELETE FROM scheduled_executions WHERE finished_at < ?", before)
 	if err != nil {
 		return 0, err

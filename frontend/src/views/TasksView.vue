@@ -13,13 +13,25 @@ const showDetailModal = ref(false)
 const selectedTask = ref<Task | null>(null)
 const selectedTasks = ref<Task[]>([])
 const createModalRef = ref<InstanceType<typeof CreateTaskModal> | null>(null)
-let refreshInterval: number | null = null
+
+
+// Pagination state
+const pagination = ref({
+  page: 1,
+  pageSize: 10,
+  total: 0
+})
 
 const refreshTasks = async () => {
   try {
     loading.value = true
-    const response = await taskApi.list({ limit: 10, offset: 0 })
+    const offset = (pagination.value.page - 1) * pagination.value.pageSize
+    const response = await taskApi.list({ 
+      limit: pagination.value.pageSize, 
+      offset: offset 
+    })
     tasks.value = response.tasks
+    pagination.value.total = response.total || response.tasks.length
   } catch (error) {
     ElMessage.error('加载任务失败')
   } finally {
@@ -43,6 +55,17 @@ const showTaskDetail = (task: Task) => {
   showDetailModal.value = true
 }
 
+const handlePageChange = (page: number) => {
+  pagination.value.page = page
+  refreshTasks()
+}
+
+const handlePageSizeChange = (pageSize: number) => {
+  pagination.value.pageSize = pageSize
+  pagination.value.page = 1  // Reset to first page when changing page size
+  refreshTasks()
+}
+
 const handleDelete = async (task: Task) => {
   try {
     await ElMessageBox.confirm(
@@ -59,7 +82,8 @@ const handleDelete = async (task: Task) => {
     refreshTasks()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('删除失败')
+      console.error('Delete task error:', error)
+      ElMessage.error(`删除失败: ${error instanceof Error ? error.message : '未知错误'}`)
     }
   }
 }
@@ -89,7 +113,8 @@ const handleBulkDelete = async () => {
     refreshTasks()
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('批量删除失败')
+      console.error('Bulk delete error:', error)
+      ElMessage.error(`批量删除失败: ${error instanceof Error ? error.message : '未知错误'}`)
     }
   }
 }
@@ -98,15 +123,10 @@ const handleBulkDelete = async () => {
 
 onMounted(() => {
   refreshTasks()
-  refreshInterval = window.setInterval(() => {
-    refreshTasks()
-  }, 5000)
 })
 
 onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval)
-  }
+  // 清理工作（如果有的话）
 })
 </script>
 
@@ -163,19 +183,33 @@ onUnmounted(() => {
            <el-button size="small" type="danger" @click="handleDelete(task)">删除</el-button>
          </template>
        </el-table-column>
-     </el-table>
+      </el-table>
 
-    <CreateTaskModal
-      v-model:visible="showCreateModal"
-      @success="handleCreateSuccess"
-    />
+      <!-- Pagination -->
+      <div style="display: flex; justify-content: center; margin-top: 20px;">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :page-sizes="[10, 20, 50]"
+          :total="pagination.total"
+          layout="sizes, prev, pager, next, total"
+          :background="true"
+          @size-change="handlePageSizeChange"
+          @current-change="handlePageChange"
+        />
+      </div>
 
-    <TaskDetailModal
-      :visible="showDetailModal"
-      :task="selectedTask"
-      @update:visible="(val) => showDetailModal = val"
-    />
-  </div>
+     <CreateTaskModal
+       v-model:visible="showCreateModal"
+       @success="handleCreateSuccess"
+     />
+
+     <TaskDetailModal
+       :visible="showDetailModal"
+       :task="selectedTask"
+       @update:visible="(val) => showDetailModal = val"
+     />
+   </div>
 </template>
 
 <style scoped>
