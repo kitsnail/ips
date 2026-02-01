@@ -4,14 +4,8 @@ import { useRoute } from 'vue-router'
 
 const route = useRoute()
 
-// Breadcrumb item structure
-interface BreadcrumbItem {
-  label: string
-  path: string
-}
-
-// Route configuration for breadcrumb labels
-const routeLabels: Record<string, string> = {
+// Map of route names/paths to friendly labels where meta.title isn't available
+const labelMap: Record<string, string> = {
   '/dashboard': '概览',
   '/tasks': '任务管理',
   '/tasks/create': '创建任务',
@@ -27,59 +21,40 @@ const routeLabels: Record<string, string> = {
   '/admin/logs': '系统日志',
 }
 
-// Parent routes for breadcrumb building
-const routeParents: Record<string, { label: string, path: string }> = {
-  '/tasks': { label: '任务管理', path: '/tasks' },
-  '/scheduled': { label: '定时任务', path: '/scheduled' },
-  '/library': { label: '镜像库', path: '/library' },
-  '/secrets': { label: '仓库认证', path: '/secrets' },
-  '/admin': { label: '系统设置', path: '/admin' },
-}
+const breadcrumbs = computed(() => {
 
-const breadcrumbs = computed<BreadcrumbItem[]>(() => {
+  const items: Array<{ label: string, path: string }> = []
+
+  // If we are essentially at the root (just dashboard), show nothing or just Dashboard
+  // But generally matched array gives us the hierarchy.
+  
+  // Custom handling: We want to show the full path based on the URL segments because
+  // route.matched might be nested in a way that doesn't strictly follow the menu hierarchy visually
+  // OR we can stick to the labelMap which seemed to define the desired hierarchy.
+  
+  // Let's use the labelMap approach essentially as "Source of Truth" for labels, 
+  // but generate the path segments dynamically to avoid the "double add" bug.
+  // The previous bug was adding Parent AND Current for the same segment.
+  
   const path = route.path
-  const items: BreadcrumbItem[] = []
-
-  // Remove leading slash and split
   const segments = path.replace(/^\//, '').split('/')
-
-  // Build breadcrumb path segments
+  
   let currentPath = ''
   for (const segment of segments) {
     if (!segment) continue
-
     currentPath += '/' + segment
-
-    // Check if this is a subpage (has parent)
-    const parent = routeParents[currentPath]
-    if (parent) {
-      // Add parent first if not already added
-      if (!items.find(item => item.path === parent.path)) {
-        items.push({
-          label: parent.label,
-          path: parent.path,
-        })
-      }
-      // Add current page
-      const currentLabel = routeLabels[currentPath]
-      if (currentLabel) {
-        items.push({
-          label: currentLabel,
-          path: currentPath,
-        })
-      }
-    } else {
-      // Direct page (no parent)
-      const currentLabel = routeLabels[currentPath]
-      if (currentLabel && !items.find(item => item.path === currentPath)) {
-        items.push({
-          label: currentLabel,
-          path: currentPath,
-        })
-      }
+    
+    // Only add if we have a label for this path
+    if (labelMap[currentPath]) {
+      items.push({
+        label: labelMap[currentPath]!,
+        path: currentPath
+      })
     }
   }
 
+  // Handle root/dashboard case if needed, but based on the map, /dashboard is handled.
+  
   return items
 })
 
@@ -89,76 +64,21 @@ const lastItemIndex = computed(() => {
 </script>
 
 <template>
-  <nav v-if="breadcrumbs.length > 0" class="breadcrumb">
-    <router-link
-      v-for="(item, index) in breadcrumbs"
-      :key="item.path"
-      :to="item.path"
-      class="breadcrumb-item"
-      :class="{ last: index === lastItemIndex }"
-    >
-      {{ item.label }}
-    </router-link>
+  <nav v-if="breadcrumbs.length > 0" class="flex items-center gap-2 text-sm">
+    <template v-for="(item, index) in breadcrumbs" :key="item.path">
+       <router-link
+        v-if="index !== lastItemIndex"
+        :to="item.path"
+        class="text-slate-500 hover:text-cyan-600 dark:text-slate-400 dark:hover:text-cyan-400 transition-colors flex items-center"
+      >
+        {{ item.label }}
+      </router-link>
+      <span v-else class="text-slate-900 dark:text-slate-200 font-medium">
+        {{ item.label }}
+      </span>
+      
+      <!-- Separator -->
+      <span v-if="index !== lastItemIndex" class="text-slate-300 dark:text-slate-600 font-light">/</span>
+    </template>
   </nav>
 </template>
-
-<style scoped>
-.breadcrumb {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.breadcrumb-item {
-  color: #64748b;
-  text-decoration: none;
-  transition: color 0.15s;
-  display: flex;
-  align-items: center;
-}
-
-.breadcrumb-item:not(.last):hover {
-  color: #0891b2;
-}
-
-.breadcrumb-item:not(.last)::after {
-  content: '/';
-  margin-left: 8px;
-  color: #cbd5e1;
-  font-weight: 300;
-}
-
-.breadcrumb-item.last {
-  color: #0f172a;
-  font-weight: 500;
-}
-
-.breadcrumb-item.last:hover {
-  color: #0f172a;
-  cursor: default;
-}
-
-/* Dark mode */
-@media (prefers-color-scheme: dark) {
-  .breadcrumb-item {
-    color: #94a3b8;
-  }
-
-  .breadcrumb-item:not(.last):hover {
-    color: #22d3ee;
-  }
-
-  .breadcrumb-item:not(.last)::after {
-    color: #475569;
-  }
-
-  .breadcrumb-item.last {
-    color: #f8fafc;
-  }
-
-  .breadcrumb-item.last:hover {
-    color: #f8fafc;
-  }
-}
-</style>

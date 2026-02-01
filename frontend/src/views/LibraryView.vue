@@ -107,8 +107,9 @@ const handleBatchDelete = async () => {
       '确认删除',
       { type: 'warning' }
     )
-    for (const id of selectedImages.value) {
-      await libraryApi.delete(id)
+    for (const item of selectedImages.value) {
+      // @ts-ignore
+      await libraryApi.delete(item.id)
     }
     ElMessage.success(`成功删除 ${selectedImages.value.length} 个镜像`)
     selectedImages.value = []

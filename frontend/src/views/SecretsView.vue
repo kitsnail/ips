@@ -79,8 +79,9 @@ const handleBatchDelete = async () => {
       '确认删除',
       { type: 'warning' }
     )
-    for (const id of selectedSecrets.value) {
-      await secretApi.delete(id)
+    for (const item of selectedSecrets.value) {
+      // @ts-ignore
+      await secretApi.delete(item.id)
     }
     ElMessage.success(`成功删除 ${selectedSecrets.value.length} 个认证信息`)
     selectedSecrets.value = []
