@@ -2,19 +2,19 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { scheduledTaskApi, taskApi } from '@/services/api'
-import type { ScheduledExecution, ScheduledTask, Task } from '@/types/api'
+import { scheduledTaskApi } from '@/services/api'
+import type { ScheduledExecution, ScheduledTask } from '@/types/api'
 
 const route = useRoute()
 const router = useRouter()
 
+// Get scheduled task ID from route params
 const scheduledTaskId = computed(() => route.params.id as string)
 
 const loading = ref(false)
 const taskLoading = ref(false)
 const executions = ref<ScheduledExecution[]>([])
 const scheduledTask = ref<ScheduledTask | null>(null)
-const executionTasks = ref<Map<string, Task>>(new Map())
 
 const pagination = ref({
   page: 1,
@@ -56,22 +56,9 @@ const loadExecutions = async () => {
 
     executions.value = response.executions
     pagination.value.total = response.total
-
-    // Load related tasks
-    const taskIds = [...new Set(response.executions.map(e => e.taskId))]
-    for (const taskId of taskIds) {
-      if (!executionTasks.value.has(taskId)) {
-        try {
-          const task = await taskApi.get(taskId)
-          executionTasks.value.set(taskId, task)
-        } catch (error) {
-          console.error(`Failed to load task ${taskId}:`, error)
-        }
-      }
-    }
   } catch (error) {
     ElMessage.error('加载执行历史失败')
-    console.error(error)
+    console.error('Load executions error:', error)
   } finally {
     loading.value = false
   }
@@ -136,7 +123,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="scheduled-executions">
+  <div class="scheduled-executions" v-loading="loading">
     <!-- Page Header -->
     <div class="page-header">
       <div class="header-left">
@@ -192,6 +179,14 @@ onMounted(() => {
         <div class="detail-label">创建时间</div>
         <div class="detail-value">{{ new Date(scheduledTask.createdAt).toLocaleString() }}</div>
       </div>
+      <div class="detail-item">
+        <div class="detail-label">最后执行时间</div>
+        <div class="detail-value">{{ scheduledTask.lastExecutionAt ? new Date(scheduledTask.lastExecutionAt).toLocaleString() : '从未执行过' }}</div>
+      </div>
+      <div class="detail-item">
+        <div class="detail-label">下次执行时间</div>
+        <div class="detail-value">{{ scheduledTask.nextExecutionAt ? new Date(scheduledTask.nextExecutionAt).toLocaleString() : '无' }}</div>
+      </div>
     </div>
 
     <!-- Filters -->
@@ -223,10 +218,7 @@ onMounted(() => {
         <el-table-column prop="id" label="执行ID" width="80" />
         <el-table-column prop="taskId" label="任务ID" width="180">
           <template #default="{ row }">
-            <span
-              class="task-link"
-              @click="viewTaskDetail(row.taskId)"
-            >
+            <span class="task-link">
               {{ row.taskId }}
             </span>
           </template>
@@ -364,7 +356,7 @@ onMounted(() => {
   padding: 20px;
   margin-bottom: 24px;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
 

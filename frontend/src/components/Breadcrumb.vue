@@ -10,7 +10,6 @@ const labelMap: Record<string, string> = {
   '/tasks': '任务管理',
   '/tasks/create': '创建任务',
   '/scheduled': '定时任务',
-  '/scheduled/history': '执行历史',
   '/library': '镜像库',
   '/library/import': '批量导入',
   '/secrets': '仓库认证',
