@@ -149,7 +149,7 @@ func main() {
 	logger.Info("Scheduled task manager initialized")
 
 	// 6. 设置路由
-	router := api.SetupRouter(logger, taskManager, scheduledTaskManager, authService, repo, repo, repo)
+	router := api.SetupRouter(logger, taskManager, scheduledTaskManager, authService, repo, repo, repo, k8sClient)
 
 	// 6. 创建HTTP服务器
 	port := os.Getenv("SERVER_PORT")

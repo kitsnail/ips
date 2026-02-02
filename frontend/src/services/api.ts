@@ -24,6 +24,7 @@ import type {
   CreateSecretRequest,
   UpdateSecretRequest,
   ListSecretsResponse,
+  StatsResponse,
 } from '@/types/api'
 
 const API_BASE = '/api/v1'
@@ -213,6 +214,13 @@ export const userApi = {
 
   delete: async (id: number): Promise<void> => {
     await apiClient.delete(`/users/${id}`)
+  },
+}
+
+export const statsApi = {
+  getStats: async (): Promise<StatsResponse> => {
+    const response = await apiClient.get<StatsResponse>('/stats')
+    return response.data
   },
 }
 

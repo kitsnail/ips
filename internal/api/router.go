@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/kitsnail/ips/internal/api/handler"
 	"github.com/kitsnail/ips/internal/api/middleware"
+	"github.com/kitsnail/ips/internal/k8s"
 	"github.com/kitsnail/ips/internal/repository"
 	"github.com/kitsnail/ips/internal/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -11,7 +12,7 @@ import (
 )
 
 // SetupRouter 设置路由
-func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, scheduledTaskManager *service.ScheduledTaskManager, authService *service.AuthService, userRepo repository.UserRepository, libraryRepo repository.LibraryRepository, secretRepo repository.SecretRegistryRepository) *gin.Engine {
+func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, scheduledTaskManager *service.ScheduledTaskManager, authService *service.AuthService, userRepo repository.UserRepository, libraryRepo repository.LibraryRepository, secretRepo repository.SecretRegistryRepository, k8sClient *k8s.Client) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
 	router := gin.New()
@@ -48,10 +49,16 @@ func SetupRouter(logger *logrus.Logger, taskManager *service.TaskManager, schedu
 	// 健康检查处理器
 	healthHandler := handler.NewHealthHandler()
 
+	// 统计数据处理器
+	statsHandler := handler.NewStatsHandler(k8sClient)
+
 	// 健康检查端点（不需要认证）
 	router.GET("/health", healthHandler.HealthCheck)
 	router.GET("/healthz", healthHandler.HealthCheck)
 	router.GET("/readyz", healthHandler.ReadyCheck)
+
+	// 统计数据端点（不需要认证）
+	router.GET("/api/v1/stats", statsHandler.GetStats)
 
 	// Prometheus 指标端点
 	router.GET("/metrics", gin.WrapH(promhttp.Handler()))

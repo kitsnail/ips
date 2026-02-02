@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { taskApi, scheduledTaskApi } from '@/services/api'
+import { taskApi, scheduledTaskApi, statsApi } from '@/services/api'
 import type { Task } from '@/types/api'
 
 const loading = ref(false)
 const runningTasks = ref(0)
 const successRate = ref(0)
-const nodes = ref('0/0')
+const nodesTotal = ref(0)
+const nodesReady = ref(0)
 const scheduledTasks = ref(0)
 const scheduledActive = ref(0)
 const recentTasks = ref<Task[]>([])
+
+const nodes = computed(() => `${nodesReady.value}/${nodesTotal.value}`)
+
 
 
 
@@ -18,13 +22,15 @@ const refreshDashboardStats = async () => {
   try {
     loading.value = true
 
-    const [tasksResponse, scheduledResponse] = await Promise.all([
+    const [tasksResponse, scheduledResponse, statsResponse] = await Promise.all([
       taskApi.list({ limit: 1000 }),
       scheduledTaskApi.list({ limit: 100 }),
+      statsApi.getStats(),
     ])
 
     const tasks = tasksResponse?.tasks || []
     const scheduled = scheduledResponse?.tasks || []
+    const stats = statsResponse?.nodes || { total: 0, ready: 0, coverage: 0 }
 
     const running = tasks.filter((t) => t.status === 'running').length
     const pending = tasks.filter((t) => t.status === 'pending').length
@@ -34,6 +40,9 @@ const refreshDashboardStats = async () => {
     const todayTasks = tasks.filter((t) => new Date(t.createdAt).toDateString() === today)
     const completed = todayTasks.filter((t) => t.status === 'completed').length
     successRate.value = todayTasks.length > 0 ? Math.round((completed / todayTasks.length) * 100) : 100
+
+    nodesTotal.value = stats.total
+    nodesReady.value = stats.ready
 
     scheduledTasks.value = scheduled.length
     scheduledActive.value = scheduled.filter((t) => t.enabled).length

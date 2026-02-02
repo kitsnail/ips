@@ -292,3 +292,14 @@ export interface LogEntry {
   message: string
   details?: string
 }
+
+// Stats Types
+export interface NodeStats {
+  total: number
+  ready: number
+  coverage: number
+}
+
+export interface StatsResponse {
+  nodes: NodeStats
+}
