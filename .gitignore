@@ -38,3 +38,7 @@ coverage.html
 # Temporary files
 tmp/
 temp/
+
+# Build output
+web/static/dist/
+frontend/dist/
