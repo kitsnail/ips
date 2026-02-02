@@ -14,6 +14,7 @@ type CreateTaskRequest struct {
 	Username      string            `json:"username,omitempty" binding:"omitempty"`                     // 镜像仓库用户名
 	Password      string            `json:"password" binding:"omitempty"`                               // 镜像仓库密码（不包含在 API 响应中）
 	SecretID      int64             `json:"secretId,omitempty" binding:"omitempty"`                     // 已保存的仓库认证 ID（二选一：使用 secretId 或手动输入凭证）
+	ID            string            `json:"id,omitempty"`                                               // 可选，预热任务的 ID（定时触发时使用 sched- 前缀）
 }
 
 // ListTasksRequest 列表查询请求

@@ -75,7 +75,14 @@ func (m *TaskManager) CreateTask(ctx context.Context, req *models.CreateTaskRequ
 	}
 
 	// 生成任务ID
-	taskID := models.GenerateTaskID()
+	var taskID string
+	if req.ID != "" {
+		// 使用请求中提供的 ID（定时触发时）
+		taskID = req.ID
+	} else {
+		// 手动触发，使用默认 "task" 前缀
+		taskID = models.GenerateTaskID("")
+	}
 
 	// 设置默认优先级
 	priority := req.Priority

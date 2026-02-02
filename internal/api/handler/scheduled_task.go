@@ -39,7 +39,8 @@ func (h *ScheduledTaskHandler) CreateScheduledTask(c *gin.Context) {
 		req.OverlapPolicy = models.OverlapPolicySkip
 	}
 
-	taskID := models.GenerateTaskID()
+	// 生成 ScheduledTask ID（使用 sched- 前缀）
+	taskID := models.GenerateTaskID("sched")
 	task := &models.ScheduledTask{
 		ID:             taskID,
 		Name:           req.Name,

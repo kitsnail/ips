@@ -339,6 +339,9 @@ func (m *ScheduledTaskManager) executeTask(scheduledTaskID string) (string, erro
 	m.executingTasks[scheduledTaskID] = true
 	m.mu.Unlock()
 
+	// 预生成 Task ID（使用 sched- 前缀以区分定时触发）
+	taskID := models.GenerateTaskID("sched")
+
 	ctx := context.Background()
 	if task.TimeoutSeconds > 0 {
 		var cancel context.CancelFunc
@@ -347,6 +350,7 @@ func (m *ScheduledTaskManager) executeTask(scheduledTaskID string) (string, erro
 	}
 
 	createReq := &models.CreateTaskRequest{
+		ID:            taskID, // 使用预生成的 sched- 前缀 ID
 		Images:        task.TaskConfig.Images,
 		BatchSize:     task.TaskConfig.BatchSize,
 		Priority:      task.TaskConfig.Priority,
