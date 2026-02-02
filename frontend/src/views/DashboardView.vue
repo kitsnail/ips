@@ -183,29 +183,47 @@ onUnmounted(() => {
 
 .stat-label {
   font-size: 13px;
-  color: #64748b;
   font-weight: 500;
   margin-bottom: 8px;
+  transition: color 0.2s ease;
 }
 
 .stat-value {
   font-size: 28px;
   font-weight: 700;
-  color: #0f172a;
   line-height: 1;
   margin-bottom: 4px;
+  transition: color 0.2s ease;
 }
 
 .stat-trend {
   font-size: 12px;
-  color: #22c55e;
   display: flex;
   align-items: center;
   gap: 4px;
+  transition: color 0.2s ease;
 }
 
-.stat-trend.neutral {
+/* Dark mode overrides */
+:global(.dark) .stat-card {
+  border-color: #334155;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .stat-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+}
+
+:global(.dark) .stat-label {
   color: #94a3b8;
+}
+
+:global(.dark) .stat-value {
+  color: #f1f5f9;
+}
+
+:global(.dark) .stat-trend.neutral {
+  color: #64748b;
 }
 
 .card {
@@ -215,6 +233,7 @@ onUnmounted(() => {
   border: 1px solid #e2e8f0;
   padding: 0;
   overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .section-header {
@@ -223,13 +242,14 @@ onUnmounted(() => {
   justify-content: space-between;
   padding: 20px 24px;
   border-bottom: 1px solid #e2e8f0;
+  transition: border-color 0.2s ease;
 }
 
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #0f172a;
   margin: 0;
+  transition: color 0.2s ease;
 }
 
 .section-actions {
@@ -239,6 +259,20 @@ onUnmounted(() => {
 
 .table-container {
   padding: 0 24px 24px 24px;
+}
+
+/* Dark mode for card and section */
+:global(.dark) .card {
+  border-color: #334155;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+:global(.dark) .section-header {
+  border-bottom-color: #334155;
+}
+
+:global(.dark) .section-title {
+  color: #f1f5f9;
 }
 
 @media (max-width: 1024px) {

@@ -14,3 +14,444 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+
+/* ===========================================
+   CSS VARIABLES FOR CONSISTENT THEMING
+   =========================================== */
+:root {
+  --ips-text-primary: #0f172a;
+  --ips-text-secondary: #64748b;
+  --ips-border-color: #e2e8f0;
+  --ips-bg-card: transparent;
+}
+
+html.dark {
+  --ips-text-primary: #f1f5f9;
+  --ips-text-secondary: #94a3b8;
+  --ips-border-color: #334155;
+  --ips-bg-card: transparent;
+}
+
+
+/* ===========================================
+   COMMON CLASSES FOR SCOPED STYLES
+   =========================================== */
+
+/* Text colors */
+.ips-text-primary {
+  color: var(--ips-text-primary);
+}
+
+.ips-text-secondary {
+  color: var(--ips-text-secondary);
+}
+
+/* Border colors */
+.ips-border {
+  border-color: var(--ips-border-color);
+}
+
+/* Cards and containers */
+.ips-card {
+  background: var(--ips-bg-card);
+  border: 1px solid var(--ips-border-color);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.ips-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+html.dark .ips-card {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+html.dark .ips-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+}
+
+
+/* ===========================================
+   COMPREHENSIVE DARK MODE OVERRIDES
+   =========================================== */
+
+/* Dark mode for hardcoded text colors in scoped styles */
+html.dark .text-slate-700,
+html.dark .text-slate-800,
+html.dark .text-slate-900 {
+  color: #f1f5f9 !important;
+}
+
+html.dark .text-slate-500,
+html.dark .text-slate-400,
+html.dark .text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+html.dark .text-slate-300 {
+  color: #64748b !important;
+}
+
+/* Dark mode for hardcoded border colors */
+html.dark .border-slate-200,
+html.dark .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+/* Dark mode background overrides */
+html.dark .bg-slate-50,
+html.dark .bg-slate-100 {
+  background-color: transparent !important;
+}
+
+/* Dark mode for specific component patterns */
+html.dark [class*="section-title"],
+html.dark [class*="card-title"],
+html.dark [class*="page-title"] {
+  color: #f1f5f9 !important;
+}
+
+html.dark [class*="section-header"] {
+  border-bottom-color: #334155 !important;
+}
+
+html.dark [class*="section-description"],
+html.dark [class*="section-subtitle"] {
+  color: #94a3b8 !important;
+}
+
+/* Dark mode background colors for custom components */
+.dark .stat-card {
+  background: transparent !important;
+  border-color: #334155 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .stat-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.4) !important;
+}
+
+.dark .stat-label {
+  color: #94a3b8 !important;
+}
+
+.dark .stat-value {
+  color: #f1f5f9 !important;
+}
+
+.dark .stat-trend.neutral {
+  color: #64748b !important;
+}
+
+.dark .card {
+  background: transparent !important;
+  border-color: #334155 !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3) !important;
+}
+
+.dark .section-header {
+  border-bottom-color: #334155 !important;
+}
+
+.dark .section-title {
+  color: #f1f5f9 !important;
+}
+
+/* Element Plus table dark mode overrides */
+.dark .el-table {
+  --el-table-bg-color: transparent !important;
+  --el-table-tr-bg-color: transparent !important;
+  --el-table-header-bg-color: #1e293b !important;
+  --el-table-row-hover-bg-color: #334155 !important;
+  --el-table-border-color: #334155 !important;
+  --el-table-text-color: #e2e8f0 !important;
+  --el-table-header-text-color: #94a3b8 !important;
+}
+
+.dark .el-table th.el-table__cell {
+  background-color: #1e293b !important;
+}
+
+.dark .el-table .el-table__row:hover > td.el-table__cell {
+  background-color: #334155 !important;
+}
+
+/* Element Plus form elements */
+.dark .el-input__wrapper {
+  background-color: #1e293b !important;
+  box-shadow: 0 0 0 1px #475569 inset !important;
+}
+
+.dark .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px #64748b inset !important;
+}
+
+.dark .el-input__inner {
+  color: #f1f5f9 !important;
+}
+
+.dark .el-select .el-input__wrapper {
+  background-color: #1e293b !important;
+}
+
+.dark .el-textarea__inner {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  box-shadow: 0 0 0 1px #475569 inset !important;
+}
+
+.dark .el-form-item__label {
+  color: #e2e8f0 !important;
+}
+
+/* Element Plus dialog */
+.dark .el-dialog {
+  --el-dialog-bg-color: #1e293b !important;
+  --el-dialog-title-font-color: #f1f5f9 !important;
+}
+
+.dark .el-dialog__header {
+  border-bottom: 1px solid #334155 !important;
+}
+
+.dark .el-dialog__body {
+  color: #e2e8f0 !important;
+}
+
+/* Element Plus card */
+.dark .el-card {
+  --el-card-bg-color: transparent !important;
+  background-color: transparent !important;
+  border-color: #334155 !important;
+}
+
+.dark .el-card__header {
+  border-bottom-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+.dark .el-card__body {
+  color: #e2e8f0 !important;
+}
+
+/* Element Plus tabs */
+.dark .el-tabs__item {
+  color: #94a3b8 !important;
+}
+
+.dark .el-tabs__item.is-active {
+  color: #60a5fa !important;
+}
+
+.dark .el-tabs__active-bar {
+  background-color: #60a5fa !important;
+}
+
+/* Element Plus buttons - outline/ghost variants */
+.dark .el-button--default {
+  background-color: transparent !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+
+.dark .el-button--default:hover {
+  background-color: #334155 !important;
+  border-color: #64748b !important;
+}
+
+/* Element Plus tag */
+.dark .el-tag {
+  --el-tag-bg-color: #334155 !important;
+  --el-tag-text-color: #e2e8f0 !important;
+  --el-tag-border-color: #475569 !important;
+}
+
+/* Element Plus dropdown */
+.dark .el-dropdown-menu {
+  --el-dropdown-bg-color: #1e293b !important;
+  --el-dropdown-item-hover-fill: #334155 !important;
+  --el-dropdown-item-hover-color: #f1f5f9 !important;
+  --el-dropdown-item-color: #e2e8f0 !important;
+}
+
+.dark .el-dropdown-menu__item {
+  color: #e2e8f0 !important;
+}
+
+/* Element Plus message */
+.dark .el-message-box {
+  --el-messagebox-bg-color: #1e293b !important;
+  --el-messagebox-title-color: #f1f5f9 !important;
+}
+
+.dark .el-message-box__content {
+  color: #e2e8f0 !important;
+}
+
+/* Element Plus notification */
+.dark .el-notification {
+  --el-notification-bg-color: #1e293b !important;
+}
+
+.dark .el-notification__title {
+  color: #f1f5f9 !important;
+}
+
+.dark .el-notification__content {
+  color: #e2e8f0 !important;
+}
+
+/* Element Plus drawer */
+.dark .el-drawer {
+  --el-drawer-bg-color: #1e293b !important;
+}
+
+.dark .el-drawer__header {
+  border-bottom: 1px solid #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+.dark .el-drawer__body {
+  color: #e2e8f0 !important;
+}
+
+/* Element Plus date picker */
+.dark .el-date-picker,
+.dark .el-date-range-picker,
+.dark .el-picker-panel {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+.dark .el-date-picker__header-label,
+.dark .el-date-table th {
+  color: #94a3b8 !important;
+}
+
+.dark .el-date-table td.available:hover {
+  background-color: #334155 !important;
+}
+
+.dark .el-date-table td.today .el-date-table-cell__text {
+  color: #60a5fa !important;
+}
+
+/* Element Plus autocomplete */
+.dark .el-autocomplete-suggestion {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+.dark .el-autocomplete-suggestion li {
+  color: #e2e8f0 !important;
+}
+
+.dark .el-autocomplete-suggestion li:hover {
+  background-color: #334155 !important;
+}
+
+/* Element Plus popover */
+.dark .el-popover {
+  --el-popover-bg-color: #1e293b !important;
+  --el-popover-border-color: #334155 !important;
+}
+
+.dark .el-popover__title {
+  color: #f1f5f9 !important;
+}
+
+/* Element Plus tooltip */
+.dark .el-tooltip__trigger {
+  outline: none;
+}
+
+.dark .el-tooltip__content {
+  background-color: #1e293b !important;
+  color: #e2e8f0 !important;
+  border-color: #334155 !important;
+}
+
+/* Element Plus radio/checkbox */
+.dark .el-radio__input.is-checked .el-radio__inner {
+  border-color: #60a5fa !important;
+  background-color: #60a5fa !important;
+}
+
+.dark .el-radio__label {
+  color: #e2e8f0 !important;
+}
+
+.dark .el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: #60a5fa !important;
+  border-color: #60a5fa !important;
+}
+
+.dark .el-checkbox__label {
+  color: #e2e8f0 !important;
+}
+
+/* Element Plus switch */
+.dark .el-switch.is-checked .el-switch__core {
+  background-color: #60a5fa !important;
+}
+
+/* Element Plus input number */
+.dark .el-input-number {
+  --el-input-bg-color: #1e293b !important;
+  --el-input-border-color: #475569 !important;
+  --el-input-text-color: #f1f5f9 !important;
+}
+
+.dark .el-input-number__decrease,
+.dark .el-input-number__increase {
+  background-color: #334155 !important;
+  border-color: #475569 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Element Plus progress */
+.dark .el-progress-bar__outer {
+  background-color: #334155 !important;
+}
+
+/* Element Plus empty */
+.dark .el-empty__description p {
+  color: #94a3b8 !important;
+}
+
+/* Element Plus skeleton */
+.dark .el-skeleton__item {
+  background: #334155 !important;
+}
+
+/* Element Plus upload */
+.dark .el-upload-dragger {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+}
+
+.dark .el-upload-dragger:hover {
+  border-color: #60a5fa !important;
+}
+
+/* Element Plus steps */
+.dark .el-step__title {
+  color: #94a3b8 !important;
+}
+
+.dark .el-step__title.is-process {
+  color: #60a5fa !important;
+}
+
+.dark .el-step__title.is-finish {
+  color: #22c55e !important;
+}
+
+.dark .el-step__description {
+  color: #64748b !important;
+}
