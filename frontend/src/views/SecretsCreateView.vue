@@ -67,9 +67,7 @@ const submit = async () => {
   }
 }
 
-const cancel = () => {
-  router.back()
-}
+
 </script>
 
 <template>
@@ -78,9 +76,8 @@ const cancel = () => {
     <div class="flex justify-between items-center">
       <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">添加仓库认证</h1>
       <div class="flex gap-3">
-        <el-button @click="cancel">取消</el-button>
         <el-button type="primary" @click="submit" :loading="loading">
-          保存认证
+          保存
         </el-button>
       </div>
     </div>

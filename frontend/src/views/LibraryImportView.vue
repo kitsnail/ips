@@ -112,12 +112,6 @@ const handleImport = async () => {
   }
 }
 
-const handleClear = () => {
-  importInput.value = ''
-  parsingErrors.value = []
-  importedImages.value = []
-}
-
 
 </script>
 
@@ -126,10 +120,6 @@ const handleClear = () => {
     <div class="flex justify-between items-center mb-8">
       <h1 class="text-2xl font-bold text-slate-900 dark:text-white">批量导入镜像</h1>
       <div class="flex gap-3">
-
-        <el-button @click="handleClear" :disabled="!importInput && parsingErrors.length === 0">
-          清空
-        </el-button>
         <el-button
           type="primary"
           @click="handleImport"

@@ -303,7 +303,7 @@ onMounted(() => {
       <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">创建定时任务</h1>
       <div class="flex gap-3">
         <el-button type="primary" @click="submit" :loading="loading">
-          创建任务
+          保存
         </el-button>
       </div>
     </div>
