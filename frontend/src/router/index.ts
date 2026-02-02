@@ -36,6 +36,10 @@ const router = createRouter({
           path: 'create',
           component: () => import('@/views/TasksCreateView.vue'),
         },
+        {
+          path: ':id',
+          component: () => import('@/views/TasksDetailView.vue'),
+        },
       ],
     },
     {
@@ -48,8 +52,16 @@ const router = createRouter({
           component: () => import('@/views/ScheduledTasksView.vue'),
         },
         {
+          path: 'create',
+          component: () => import('@/views/ScheduledTasksCreateView.vue'),
+        },
+        {
           path: 'history',
           component: () => import('@/views/ScheduledHistoryView.vue'),
+        },
+        {
+          path: ':id/executions',
+          component: () => import('@/views/ScheduledExecutionsView.vue'),
         },
       ],
     },

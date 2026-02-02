@@ -61,6 +61,7 @@ const menuItems: MenuItem[] = [
     path: '/scheduled',
     children: [
       { id: 'scheduled-list', label: '任务列表', path: '/scheduled' },
+      { id: 'scheduled-create', label: '创建任务', path: '/scheduled/create' },
       { id: 'scheduled-history', label: '执行历史', path: '/scheduled/history' },
     ],
   },

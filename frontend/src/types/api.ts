@@ -127,6 +127,9 @@ export interface TaskConfig {
   retryDelay: number
   webhookUrl?: string
   secretId?: number
+  registry?: string
+  username?: string
+  password?: string
 }
 
 export type ScheduledExecutionStatus = 'success' | 'failed' | 'skipped' | 'timeout'

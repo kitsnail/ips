@@ -61,6 +61,7 @@ const shortcuts = [
   { key: 'Ctrl/Cmd + N', label: '创建任务', action: () => router.push('/tasks/create'), category: '任务' },
   { key: 'Ctrl/Cmd + Shift + T', label: '任务列表', action: () => router.push('/tasks'), category: '任务' },
   { key: 'Ctrl/Cmd + S', label: '定时任务', action: () => router.push('/scheduled'), category: '定时' },
+  { key: 'Ctrl/Cmd + Shift + S', label: '创建定时任务', action: () => router.push('/scheduled/create'), category: '定时' },
   { key: 'Ctrl/Cmd + L', label: '镜像库', action: () => router.push('/library'), category: '镜像' },
   { key: 'Ctrl/Cmd + E', label: '仓库认证', action: () => router.push('/secrets'), category: '镜像' },
   { key: 'Ctrl/Cmd + A', label: '系统设置', action: () => router.push('/admin/settings'), category: '系统' },

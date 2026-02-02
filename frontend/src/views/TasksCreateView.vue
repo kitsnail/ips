@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { taskApi, libraryApi, secretApi } from '@/services/api'
@@ -35,7 +35,6 @@ const showOnlySelected = ref(false)
 
 // Form validation
 const formErrors = ref<Record<string, string>>({})
-const formTouched = ref<Record<string, boolean>>({})
 
 const validateForm = (): boolean => {
   const errors: Record<string, string> = {}
@@ -128,10 +127,6 @@ const validateForm = (): boolean => {
 
   formErrors.value = errors
   return Object.values(errors).every(error => error === '')
-}
-
-const markFieldTouched = (field: string) => {
-  formTouched.value[field] = true
 }
 
 // Computeds
